@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dimensión • SayDim</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body data-page="dimension">
+    <header>
+      <button
+        class="UpperButton"
+        onclick="location.href='index.html'"
+        title="Inicio"
+      >
+        ⟵
+      </button>
+      <h1>Dimensión</h1>
+      <button
+        class="UpperButton"
+        onclick="location.href='add.html'"
+        title="Agregar"
+      >
+        ＋
+      </button>
+    </header>
+    <nav id="dim-hero"></nav>
+    <main>
+      <h3>Personajes de la dimensión</h3>
+      <div id="characters"></div>
+    </main>
+    <script>(function(){ if(location.protocol==='file:') window.SAYDIM_MOCK = true; })();</script>
+    <script src="js/mock.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

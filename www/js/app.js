@@ -1,10 +1,33 @@
-// Check SD card status on page load
+// App bootstrap: detect page and initialize
 document.addEventListener("DOMContentLoaded", () => {
   checkSDCardStatus();
-  loadDims();
-  loadCharacters();
-  setupEventListeners();
-  // Toggle show/hide of new dimension form in the new layout
+
+  const page = detectPage();
+
+  switch (page) {
+    case "index":
+      // Landing: list dimensions and recent characters
+      loadDims();
+      loadCharacters();
+      break;
+    case "dimension":
+      initDimensionPage();
+      break;
+    case "character":
+      initCharacterPage();
+      break;
+    case "add":
+      // Build selects and wire forms
+      loadDims();
+      setupEventListeners();
+      break;
+    default:
+      // Fallback to index behavior
+      loadDims();
+      loadCharacters();
+  }
+
+  // Optional toggle in legacy layout
   const tgl = document.getElementById("toggleNewDim");
   if (tgl) {
     tgl.addEventListener("click", () => {
@@ -15,17 +38,32 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+function detectPage() {
+  const p = (document.body?.dataset?.page || "").toLowerCase();
+  if (p) return p;
+  const path = (location.pathname || "").toLowerCase();
+  if (path.endsWith("/dimension.html")) return "dimension";
+  if (path.endsWith("/vistadim.html")) return "dimension"; // backward compatibility
+  if (path.endsWith("/character.html")) return "character";
+  if (path.endsWith("/vistachar.html")) return "character"; // backward compatibility
+  if (path.endsWith("/add.html")) return "add";
+  if (path.endsWith("/index.html") || path.endsWith("/")) return "index";
+  return "index";
+}
+
 // Check if SD card is available
 async function checkSDCardStatus() {
   try {
     const response = await fetch("/api/status");
     const data = await response.json();
     if (!data.sdAvailable) {
-      document.getElementById("sdcardError").style.display = "block";
+      const box = document.getElementById("sdcardError");
+      if (box) box.style.display = "block";
     }
   } catch (error) {
     console.error("Error checking SD card status:", error);
-    document.getElementById("sdcardError").style.display = "block";
+    const box = document.getElementById("sdcardError");
+    if (box) box.style.display = "block";
   }
 }
 
@@ -130,40 +168,42 @@ function updateDimensionsUI(dims) {
   const filter = document.getElementById("filterDim");
   const charDim = document.getElementById("charDim");
 
-  // Clear existing content
-  ddiv.innerHTML = "";
-  filter.innerHTML = '<option value="">--Todas--</option>';
-  charDim.innerHTML = "";
+  // Clear existing content if present
+  if (ddiv) ddiv.innerHTML = "";
+  if (filter) filter.innerHTML = '<option value="">--Todas--</option>';
+  if (charDim) charDim.innerHTML = "";
 
   // Add each dimension to the UI
   dims.forEach((d) => {
     const displayName = d.name || d.nombre || "Sin nombre";
-    // Create dimension card
-    const card = document.createElement("div");
-    card.className = "dim-card";
-    card.onclick = () => showDimension(d.id);
 
-    const img = document.createElement("img");
-    img.src = d.image.startsWith("http") ? d.image : `/asset${d.image}`;
-    img.alt = displayName;
-    // Si falla la carga local, usar una imagen libre de picsum.photos basada en el id
-    img.onerror = () => {
-      img.onerror = null; // evitar bucles
-      img.src = `https://picsum.photos/seed/dim-${d.id}/400/300`;
-    };
+    // Fill index/dimension lists as banners if container exists
+    if (ddiv) {
+      const section = document.createElement("section");
+      section.className = "Banner";
+      const a = document.createElement("a");
+      a.href = `dimension.html?id=${encodeURIComponent(d.id)}`;
+      a.setAttribute("aria-label", `Abrir dimensión ${displayName}`);
+      const p = document.createElement("p");
+      p.className = "NombreDim";
+      p.textContent = displayName;
+      const img = document.createElement("img");
+      img.className = "BannerImg";
+      img.src = d.image?.startsWith("http") ? d.image : `/asset${d.image}`;
+      img.alt = displayName;
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = `https://picsum.photos/seed/dim-${d.id}/800/450`;
+      };
+      a.appendChild(p);
+      a.appendChild(img);
+      section.appendChild(a);
+      ddiv.appendChild(section);
+    }
 
-    const overlay = document.createElement("div");
-    overlay.className = "overlay";
-    overlay.textContent = displayName;
-
-    card.appendChild(img);
-    card.appendChild(overlay);
-    ddiv.appendChild(card);
-
-    // Sidebar removed in new mobile design
-
-    // Add to filter dropdowns
+    // Add to dropdowns if they exist
     [filter, charDim].forEach((select) => {
+      if (!select) return;
       const option = document.createElement("option");
       option.value = d.id;
       option.textContent = displayName;
@@ -175,9 +215,12 @@ function updateDimensionsUI(dims) {
 // Load characters from the server
 async function loadCharacters() {
   try {
-    const filter = document.getElementById("filterDim").value;
-    const sort = document.getElementById("sortField").value;
-    const dir = document.getElementById("sortDir").value;
+    const filterEl = document.getElementById("filterDim");
+    const sortEl = document.getElementById("sortField");
+    const dirEl = document.getElementById("sortDir");
+    const filter = filterEl ? filterEl.value : "";
+    const sort = sortEl ? sortEl.value : "";
+    const dir = dirEl ? dirEl.value : "asc";
 
     let url = "/api/characters?";
     if (filter) url += `dim=${filter}&`;
@@ -194,185 +237,197 @@ async function loadCharacters() {
 // Update the UI with characters data
 function updateCharactersUI(chars) {
   const container = document.getElementById("characters");
+  if (!container) return;
   container.innerHTML = "";
 
-  if (chars.length === 0) {
+  if (!chars || chars.length === 0) {
     container.innerHTML = "<p>No se encontraron personajes.</p>";
     return;
   }
 
+  const list = document.createElement("section");
+  list.className = "CharList";
+
   chars.forEach((char) => {
-    const charElement = document.createElement("div");
-    charElement.className = "character-card";
-    charElement.onclick = () => showCharacter(char.id);
+    const a = document.createElement("a");
+    a.href = `character.html?id=${encodeURIComponent(char.id)}`;
+    a.className = "CharacterInList";
+    a.setAttribute("aria-label", `Abrir personaje ${char.nombre}`);
 
-    charElement.innerHTML = `
-      <div class="character-header">
-          <img src="${
-            char.foto.startsWith("http") ? char.foto : `/asset${char.foto}`
-          }" 
-             alt="${char.nombre}" 
-               onerror="this.onerror=null;this.src='https://picsum.photos/seed/char-${
-                 char.id
-               }/300/300';">
-        <div class="character-info">
-          <h3>${escapeHTML(char.nombre)}</h3>
-          <div class="character-stats">
-            <span class="stat">Vida: ${char.vida || "N/A"}</span>
-            <span class="dimension">${escapeHTML(
-              char.dimensionName || "Sin dimensión"
-            )}</span>
-          </div>
-        </div>
-      </div>
-      <div class="character-description">
-        ${escapeHTML(char.descripcion || "Sin descripción")}
-      </div>
-    `;
+    const img = document.createElement("img");
+    img.className = "CharImg";
+    img.src = char.foto?.startsWith("http") ? char.foto : `/asset${char.foto}`;
+    img.alt = char.nombre || "Personaje";
+    img.onerror = () => {
+      img.onerror = null;
+      img.src = `https://picsum.photos/seed/char-${char.id}/80/80`;
+    };
 
-    container.appendChild(charElement);
+    const p = document.createElement("p");
+    p.className = "CharName";
+    p.textContent = char.nombre || "Sin nombre";
+
+    a.appendChild(img);
+    a.appendChild(p);
+    list.appendChild(a);
   });
+
+  container.appendChild(list);
 }
 
 // Show new dimension form
 function showNewDimension() {
-  document.getElementById("newDimForm").style.display = "block";
+  // Redirect to add page where forms live now
+  location.href = "add.html#dimension";
 }
 
 // Show dimension details
-async function showDimension(id) {
-  try {
-    const dims = await fetchJSON("/api/dimensions");
-    const dim = dims.find((d) => d.id === id);
-    if (dim) {
-      // Create a modal or update the main view to show dimension details
-      const html = `
-        <div class="dimension-detail">
-          <h2>${escapeHTML(dim.name || dim.nombre || "Sin nombre")}</h2>
-            <img src="${
-              dim.image.startsWith("http") ? dim.image : `/asset${dim.image}`
-            }" 
-               alt="${dim.name || dim.nombre || "Dimensión"}"
-                 onerror="this.onerror=null;this.src='https://picsum.photos/seed/dim-${
-                   dim.id
-                 }/800/400';">
-          <div class="dimension-description">
-            <h3>Descripción</h3>
-            <p>${escapeHTML(dim.description || "Sin descripción")}</p>
-            <h3>Historia</h3>
-            <p>${escapeHTML(dim.history || "Sin historia")}</p>
-          </div>
-          <button onclick="window.history.back()">Volver</button>
-        </div>
-      `;
-
-      // Update the main content
-      document.querySelector(".main").innerHTML = html;
-    }
-  } catch (error) {
-    console.error("Error showing dimension:", error);
-    alert("Error al cargar la dimensión");
-  }
+function showDimension(id) {
+  location.href = `dimension.html?id=${encodeURIComponent(id)}`;
 }
 
 // Show character details
-async function showCharacter(id) {
-  try {
-    const chars = await fetchJSON("/api/characters");
-    const char = chars.find((c) => c.id === id);
+function showCharacter(id) {
+  location.href = `character.html?id=${encodeURIComponent(id)}`;
+}
 
-    if (char) {
-      // Get dimension name
-      let dimName = "Sin dimensión";
+// Page initializers for multi-page layout
+async function initDimensionPage() {
+  try {
+    const id = new URLSearchParams(location.search).get("id");
+    const dims = await fetchJSON("/api/dimensions");
+    const dim = dims.find((d) => String(d.id) === String(id));
+    const hero = document.getElementById("dim-hero");
+    if (dim && hero) {
+      hero.innerHTML = "";
+      const section = document.createElement("section");
+      section.className = "Banner";
+      const p = document.createElement("p");
+      p.className = "NombreDim";
+      p.textContent = dim.name || dim.nombre || "Sin nombre";
+      const img = document.createElement("img");
+      img.className = "BannerImg";
+      img.src = dim.image?.startsWith("http")
+        ? dim.image
+        : `/asset${dim.image}`;
+      img.alt = p.textContent;
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = `https://picsum.photos/seed/dim-${dim.id}/800/450`;
+      };
+      const a = document.createElement("a");
+      a.href = "#";
+      a.appendChild(p);
+      a.appendChild(img);
+      section.appendChild(a);
+      hero.appendChild(section);
+    }
+    // List characters for this dimension
+    const chars = await fetchJSON(
+      `/api/characters?dim=${encodeURIComponent(id || "")}`
+    );
+    updateCharactersUI(chars);
+  } catch (error) {
+    console.error("Error initializing dimension page:", error);
+  }
+}
+
+async function initCharacterPage() {
+  try {
+    const id = new URLSearchParams(location.search).get("id");
+    const chars = await fetchJSON("/api/characters");
+    const char = chars.find((c) => String(c.id) === String(id));
+    if (!char) return;
+
+    // Get dimension name if missing
+    let dimName = char.dimensionName || "Sin dimensión";
+    if (!dimName && char.dimension) {
       try {
         const dims = await fetchJSON("/api/dimensions");
-        const dim = dims.find((d) => d.id === char.dimension);
-        if (dim) dimName = dim.name || dim.nombre;
-      } catch (e) {
-        console.error("Error loading dimension name:", e);
-      }
+        const dim = dims.find((d) => String(d.id) === String(char.dimension));
+        if (dim) dimName = dim.name || dim.nombre || dimName;
+      } catch {}
+    }
 
-      // Format powers if they exist
-      let powersHTML = "<p>Sin poderes definidos.</p>";
-      try {
-        if (char.powers && char.powers.length > 0) {
-          powersHTML = '<div class="powers-list">';
-          char.powers.forEach((power) => {
-            powersHTML += `
-              <div class="power-item">
-                <h4>${escapeHTML(power.nombre || "Poder sin nombre")}</h4>
-                <p>${escapeHTML(power.descripcion || "Sin descripción")}</p>
-                ${
-                  power.daño
-                    ? `<div class="power-damage">Daño: ${power.daño}</div>`
-                    : ""
-                }
-              </div>
-            `;
-          });
-          powersHTML += "</div>";
-        }
-      } catch (e) {
-        console.error("Error parsing powers:", e);
-      }
+    const container = document.getElementById("character-detail");
+    if (!container) return;
 
-      // Create the character detail view
-      const html = `
-        <div class="character-detail">
-          <button class="back-button" onclick="window.history.back()">← Volver</button>
-          
-          <div class="character-header">
-            <img src="${
-              char.foto.startsWith("http") ? char.foto : `/asset${char.foto}`
-            }" 
-        alt="${char.nombre}"
-        onerror="this.onerror=null;this.src='https://picsum.photos/seed/char-${
-          char.id
-        }-detail/600/400';">
-            <div class="character-info">
-              <h1>${escapeHTML(char.nombre)}</h1>
-              <div class="character-meta">
-                <span class="dimension">${escapeHTML(dimName)}</span>
-                ${
-                  char.vida
-                    ? `<span class="health">❤️ ${char.vida} HP</span>`
-                    : ""
-                }
-              </div>
-            </div>
-          </div>
-          
-          <div class="character-content">
-            <section class="character-description">
-              <h2>Descripción</h2>
-              <p>${char.descripcion || "Sin descripción"}</p>
-            </section>
-            
-            <section class="character-powers">
-              <h2>Poderes</h2>
-              ${powersHTML}
-            </section>
-            
+    // Powers table rows
+    let powersRows =
+      "<tr><td colspan=3 class=PowerDescription>Sin poderes definidos</td></tr>";
+    if (Array.isArray(char.powers) && char.powers.length) {
+      powersRows = char.powers
+        .map((p) => {
+          const name = escapeHTML(p.nombre || "Poder");
+          const dmg = p.daño != null ? String(p.daño) : "-";
+          const cd = p.cooldown != null ? String(p.cooldown) : "-";
+          const desc = escapeHTML(p.descripcion || "");
+          return `
+            <tr>
+              <td class="PowerName">${name}</td>
+              <td>${dmg}</td>
+              <td>${cd}</td>
+            </tr>
+            <tr>
+              <td class="PowerDescription" colspan="3">${desc}</td>
+            </tr>`;
+        })
+        .join("");
+    }
+
+    container.innerHTML = `
+      <section class="CharDetails" aria-labelledby="char-name" data-id="${escapeHTML(
+        String(char.id)
+      )}">
+        <img class="CharMainImg" src="${
+          char.foto?.startsWith("http") ? char.foto : `/asset${char.foto}`
+        }" alt="${escapeHTML(
+      char.nombre || "Personaje"
+    )}" onerror="this.onerror=null;this.src='https://picsum.photos/seed/char-${
+      char.id
+    }/300/300'" />
+        <h2 id="char-name" class="CharName">${escapeHTML(
+          char.nombre || "Sin nombre"
+        )}</h2>
+        <p class="CharDescription">${escapeHTML(
+          char.descripcion || "Sin descripción"
+        )}</p>
+
+        <table class="CharStats" aria-label="Detalles del personaje">
+          <tbody>
+            <tr><th scope="row">Vida</th><td>${
+              char.vida != null ? `${char.vida} ❤️` : "N/A"
+            }</td></tr>
+            <tr><th scope="row">Dimensión</th><td>${escapeHTML(
+              dimName
+            )}</td></tr>
             ${
-              char.comentarios
-                ? `
-              <section class="character-notes">
-                <h2>Notas adicionales</h2>
-                <p>${escapeHTML(char.comentarios)}</p>
-              </section>
-            `
+              char.created
+                ? `<tr><th>Creado</th><td>${escapeHTML(
+                    String(char.created)
+                  )}</td></tr>`
                 : ""
             }
-          </div>
-        </div>
-      `;
+            ${
+              char.comentarios
+                ? `<tr><th>Comentarios</th><td>${escapeHTML(
+                    char.comentarios
+                  )}</td></tr>`
+                : ""
+            }
+          </tbody>
+        </table>
 
-      // Update the main content
-      document.querySelector(".main").innerHTML = html;
-    }
+        <h3>Habilidades ⚡</h3>
+        <table class="Powers" aria-label="Poderes del personaje">
+          <thead>
+            <tr><th>Nombre</th><th>Daño</th><th>Cooldown</th></tr>
+          </thead>
+          <tbody>${powersRows}</tbody>
+        </table>
+      </section>`;
   } catch (error) {
-    console.error("Error showing character:", error);
-    alert("Error al cargar el personaje");
+    console.error("Error initializing character page:", error);
   }
 }
 
