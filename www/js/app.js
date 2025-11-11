@@ -4,6 +4,15 @@ document.addEventListener("DOMContentLoaded", () => {
   loadDims();
   loadCharacters();
   setupEventListeners();
+  // Toggle show/hide of new dimension form in the new layout
+  const tgl = document.getElementById("toggleNewDim");
+  if (tgl) {
+    tgl.addEventListener("click", () => {
+      const box = document.getElementById("newDimForm");
+      if (box)
+        box.style.display = box.style.display === "none" ? "block" : "none";
+    });
+  }
 });
 
 // Check if SD card is available
@@ -37,7 +46,46 @@ function setupEventListeners() {
 
 // Generic function to handle form submission with file upload
 async function uploadFormData(url, formElement, successMessage) {
-  const formData = new FormData(formElement);
+  // Rebuild FormData and optimize image inputs on the client (crop+compress)
+  const formData = new FormData();
+  const els = Array.from(formElement.elements || []);
+  for (const el of els) {
+    if (!el || !el.name) continue;
+    if (el.type === "file" && el.files && el.files[0]) {
+      const file = el.files[0];
+      let processed = file;
+      try {
+        if (url.includes("dimension")) {
+          // 16:9 cover, max 1280x720
+          processed = await processImage(file, {
+            ratio: 16 / 9,
+            maxW: 1280,
+            maxH: 720,
+            quality: 0.82,
+            fill: "#ffffff",
+          });
+        } else {
+          // 1:1 avatar, max 800x800
+          processed = await processImage(file, {
+            ratio: 1,
+            maxW: 800,
+            maxH: 800,
+            quality: 0.8,
+            fill: "#ffffff",
+          });
+        }
+      } catch (e) {
+        console.warn("Image processing failed; sending original file.", e);
+      }
+      formData.append(el.name, processed, suggestJpegName(file.name));
+    } else if (el.type === "checkbox") {
+      if (el.checked) formData.append(el.name, el.value || "on");
+    } else if (el.type === "radio") {
+      if (el.checked) formData.append(el.name, el.value);
+    } else {
+      formData.append(el.name, el.value);
+    }
+  }
 
   try {
     const response = await fetch(url, {
@@ -49,7 +97,8 @@ async function uploadFormData(url, formElement, successMessage) {
       alert(successMessage);
       formElement.reset();
       if (url.includes("dimension")) {
-        document.getElementById("newDimForm").style.display = "none";
+        const panel = document.getElementById("newDimForm");
+        if (panel) panel.style.display = "none";
         await loadDims();
       } else {
         await loadCharacters();
@@ -78,18 +127,17 @@ async function loadDims() {
 // Update the UI with dimensions data
 function updateDimensionsUI(dims) {
   const ddiv = document.getElementById("dims");
-  const sb = document.getElementById("sidebarList");
   const filter = document.getElementById("filterDim");
   const charDim = document.getElementById("charDim");
 
   // Clear existing content
   ddiv.innerHTML = "";
-  sb.innerHTML = "";
   filter.innerHTML = '<option value="">--Todas--</option>';
   charDim.innerHTML = "";
 
   // Add each dimension to the UI
   dims.forEach((d) => {
+    const displayName = d.name || d.nombre || "Sin nombre";
     // Create dimension card
     const card = document.createElement("div");
     card.className = "dim-card";
@@ -97,31 +145,28 @@ function updateDimensionsUI(dims) {
 
     const img = document.createElement("img");
     img.src = d.image.startsWith("http") ? d.image : `/asset${d.image}`;
-    img.alt = d.name;
+    img.alt = displayName;
+    // Si falla la carga local, usar una imagen libre de picsum.photos basada en el id
     img.onerror = () => {
-      img.src = "img/placeholder.jpg";
+      img.onerror = null; // evitar bucles
+      img.src = `https://picsum.photos/seed/dim-${d.id}/400/300`;
     };
 
     const overlay = document.createElement("div");
     overlay.className = "overlay";
-    overlay.textContent = d.name;
+    overlay.textContent = displayName;
 
     card.appendChild(img);
     card.appendChild(overlay);
     ddiv.appendChild(card);
 
-    // Add to sidebar
-    const sidebarItem = document.createElement("div");
-    sidebarItem.className = "sidebar-item";
-    sidebarItem.textContent = d.name;
-    sidebarItem.onclick = () => showDimension(d.id);
-    sb.appendChild(sidebarItem);
+    // Sidebar removed in new mobile design
 
     // Add to filter dropdowns
     [filter, charDim].forEach((select) => {
       const option = document.createElement("option");
       option.value = d.id;
-      option.textContent = d.name;
+      option.textContent = displayName;
       select.appendChild(option);
     });
   });
@@ -167,7 +212,9 @@ function updateCharactersUI(chars) {
             char.foto.startsWith("http") ? char.foto : `/asset${char.foto}`
           }" 
              alt="${char.nombre}" 
-               onerror="this.src='img/placeholder.jpg';">
+               onerror="this.onerror=null;this.src='https://picsum.photos/seed/char-${
+                 char.id
+               }/300/300';">
         <div class="character-info">
           <h3>${escapeHTML(char.nombre)}</h3>
           <div class="character-stats">
@@ -201,12 +248,14 @@ async function showDimension(id) {
       // Create a modal or update the main view to show dimension details
       const html = `
         <div class="dimension-detail">
-          <h2>${escapeHTML(dim.name)}</h2>
+          <h2>${escapeHTML(dim.name || dim.nombre || "Sin nombre")}</h2>
             <img src="${
               dim.image.startsWith("http") ? dim.image : `/asset${dim.image}`
             }" 
-               alt="${dim.name}"
-                 onerror="this.src='img/placeholder.jpg';">
+               alt="${dim.name || dim.nombre || "Dimensión"}"
+                 onerror="this.onerror=null;this.src='https://picsum.photos/seed/dim-${
+                   dim.id
+                 }/800/400';">
           <div class="dimension-description">
             <h3>Descripción</h3>
             <p>${escapeHTML(dim.description || "Sin descripción")}</p>
@@ -238,7 +287,7 @@ async function showCharacter(id) {
       try {
         const dims = await fetchJSON("/api/dimensions");
         const dim = dims.find((d) => d.id === char.dimension);
-        if (dim) dimName = dim.name;
+        if (dim) dimName = dim.name || dim.nombre;
       } catch (e) {
         console.error("Error loading dimension name:", e);
       }
@@ -276,8 +325,10 @@ async function showCharacter(id) {
             <img src="${
               char.foto.startsWith("http") ? char.foto : `/asset${char.foto}`
             }" 
-                 alt="${char.nombre}"
-                 onerror="this.src='/img/placeholder.jpg';">
+        alt="${char.nombre}"
+        onerror="this.onerror=null;this.src='https://picsum.photos/seed/char-${
+          char.id
+        }-detail/600/400';">
             <div class="character-info">
               <h1>${escapeHTML(char.nombre)}</h1>
               <div class="character-meta">
@@ -350,3 +401,59 @@ window.showNewDimension = showNewDimension;
 window.loadCharacters = loadCharacters;
 window.showDimension = showDimension;
 window.showCharacter = showCharacter;
+
+// --- Image processing utilities (client-side optimization) ---
+function suggestJpegName(name) {
+  const idx = name.lastIndexOf(".");
+  return (idx > 0 ? name.slice(0, idx) : name) + ".jpg";
+}
+
+async function processImage(
+  file,
+  { ratio = 1, maxW = 800, maxH = 800, quality = 0.8, fill = "#ffffff" } = {}
+) {
+  const img = await blobToImage(file);
+  // Determine target size respecting ratio and bounds
+  let targetW = maxW;
+  let targetH = Math.round(targetW / ratio);
+  if (targetH > maxH) {
+    targetH = maxH;
+    targetW = Math.round(targetH * ratio);
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = fill;
+  ctx.fillRect(0, 0, targetW, targetH);
+  // Cover scaling
+  const scale = Math.max(targetW / img.width, targetH / img.height);
+  const dw = img.width * scale;
+  const dh = img.height * scale;
+  const dx = (targetW - dw) / 2;
+  const dy = (targetH - dh) / 2;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, dx, dy, dw, dh);
+  const blob = await canvasToBlob(canvas, "image/jpeg", quality);
+  return new File([blob], suggestJpegName(file.name), { type: "image/jpeg" });
+}
+
+function blobToImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = (e) => {
+      URL.revokeObjectURL(url);
+      reject(e);
+    };
+    img.src = url;
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+}

@@ -24,9 +24,9 @@
 - El firmware imprime trazas en handlers principales (handleStaticFile, handleNotFound, api endpoints). Si no ves trazas de peticiones, asegúrate de que el Monitor Serial está abierto a 115200 y que estás viendo la salida posterior a un "Server started".
 - Si el ESP reinicia continuamente, abre Serial desde el arranque y pega las líneas iniciales.
 
-5. Placeholder de imagen no aparece
+5. Imágenes no cargan
 
-- Asegúrate de tener `img/placeholder.jpg` bajo `/www` o ajusta `app.js` para apuntar al placeholder correcto. Se recomienda añadir `/www/img/placeholder.jpg`.
+- La UI usa un fallback a imágenes remotas (picsum.photos) si falla cargar desde la SD. Si no ves imágenes, confirma que tienes conexión a internet en el equipo donde ves la UI o que las rutas en los JSON apuntan a `/dimensions/...` y `/characters/...` válidos.
 
 6. No se guardan las vistas/archivos JSON
 

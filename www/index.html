@@ -7,38 +7,43 @@
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
-    <div class="sidebar">
-      <h3>Dimensiones</h3>
-      <div id="sidebarList"></div>
-      <hr />
-      <button onclick="showNewDimension()">Nueva Dimensión</button>
-      <div id="newDimForm" style="display: none">
-        <form id="dimForm">
-          <input name="name" placeholder="Nombre" required /><br />
-          <textarea name="description" placeholder="Descripción"></textarea
-          ><br />
-          <textarea name="history" placeholder="Historia"></textarea><br />
-          <input type="file" name="image" accept="image/*" required /><br />
-          <button type="submit">Crear</button>
-        </form>
-      </div>
-    </div>
+    <header class="app-header">
+      <div class="brand">SayDim</div>
+    </header>
 
-    <div class="main">
-      <h1>Dimensiones</h1>
-      <div id="dims"></div>
-      <hr />
-      <h2>Personajes</h2>
-      <div>
-        <form id="charFilter">
-          <label
-            >Dimensión:
+    <main class="app-main">
+      <section class="section">
+        <div class="section-header">
+          <h1 class="section-title">Dimensiones</h1>
+          <button id="toggleNewDim" class="btn-secondary">
+            Nueva dimensión
+          </button>
+        </div>
+        <div id="newDimForm" class="card" style="display: none">
+          <form id="dimForm">
+            <input name="name" placeholder="Nombre" required /><br />
+            <textarea name="description" placeholder="Descripción"></textarea
+            ><br />
+            <textarea name="history" placeholder="Historia"></textarea><br />
+            <input type="file" name="image" accept="image/*" required /><br />
+            <small>La portada se ajustará a 16:9 automáticamente.</small><br />
+            <button type="submit">Crear</button>
+          </form>
+        </div>
+        <div id="dims" class="dim-list"></div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">Personajes</h2>
+        <form id="charFilter" class="toolbar">
+          <label>
+            Dimensión:
             <select id="filterDim">
               <option value="">--Todas--</option>
             </select>
           </label>
-          <label
-            >Orden:
+          <label>
+            Orden:
             <select id="sortField">
               <option value="">----</option>
               <option value="name">Nombre</option>
@@ -46,8 +51,8 @@
               <option value="created">Creado</option>
             </select>
           </label>
-          <label
-            >Dir:
+          <label>
+            Dir:
             <select id="sortDir">
               <option value="asc">Asc</option>
               <option value="desc">Desc</option>
@@ -55,29 +60,35 @@
           </label>
           <button type="button" onclick="loadCharacters()">Aplicar</button>
         </form>
-      </div>
-      <div id="characters"></div>
+        <div id="characters" class="feed"></div>
+      </section>
 
-      <hr />
-      <h3>Crear personaje</h3>
-      <form id="charForm" class="form">
-        <input name="nombre" placeholder="Nombre" required /><br />
-        <label
-          >Dimension:
-          <select name="dimension" id="charDim" required></select></label
-        ><br />
-        <input name="vida" type="number" placeholder="Vida" /><br />
-        <textarea name="descripcion" placeholder="Descripción"></textarea><br />
-        <input type="file" name="foto" accept="image/*" required /><br />
-        <textarea
-          name="powers"
-          placeholder='Poderes (JSON array). Ej: [{"nombre":"Fuego","descripcion":"Arde","daño":10}]'
-        ></textarea
-        ><br />
-        <input name="comentarios" placeholder="Comentarios extra" /><br />
-        <button type="submit">Crear personaje</button>
-      </form>
-    </div>
+      <section class="section">
+        <h3 class="section-title">Crear personaje</h3>
+        <form id="charForm" class="form">
+          <input name="nombre" placeholder="Nombre" required /><br />
+          <label>
+            Dimensión:
+            <select name="dimension" id="charDim" required></select> </label
+          ><br />
+          <input name="vida" type="number" placeholder="Vida" /><br />
+          <textarea name="descripcion" placeholder="Descripción"></textarea
+          ><br />
+          <input type="file" name="foto" accept="image/*" required /><br />
+          <small
+            >La imagen se recortará a 1:1 y se comprimirá
+            automáticamente.</small
+          ><br />
+          <textarea
+            name="powers"
+            placeholder='Poderes (JSON array). Ej: [{"nombre":"Fuego","descripcion":"Arde","daño":10}]'
+          ></textarea
+          ><br />
+          <input name="comentarios" placeholder="Comentarios extra" /><br />
+          <button type="submit">Crear personaje</button>
+        </form>
+      </section>
+    </main>
 
     <div
       id="sdcardError"
@@ -97,6 +108,8 @@
       recargue la página.
     </div>
 
+    <!-- Mock layer: enable by adding ?mock=1 to the URL before loading app.js -->
+    <script src="js/mock.js"></script>
     <script src="js/app.js"></script>
   </body>
 </html>

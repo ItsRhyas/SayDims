@@ -43,6 +43,22 @@ python -m http.server 8000
 
 Esto permite depurar CSS/JS sin necesidad de la tarjeta SD ni el ESP (pero las llamadas a `/api` fallarán a menos que crees un mock server).
 
+## Modo sin servidor (mock)
+
+Para trabajar 100% en tu PC sin encender el ESP32, el proyecto incluye un modo de simulación que intercepta las llamadas a la API y devuelve datos falsos:
+
+- Abre `www/index.html` en tu navegador con el parámetro `?mock=1`.
+  - Ejemplo: `file:///C:/ruta/a/www/index.html?mock=1`
+  - Opcional: si usas un servidor estático (p. ej. `python -m http.server`), visita `http://localhost:8000/index.html?mock=1`.
+
+Qué hace el modo mock:
+
+- Responde a `GET /api/status`, `GET /api/dimensions`, `GET /api/characters` con datos simulados en memoria.
+- Simula `POST /upload/dimension` y `POST /upload/character` devolviendo `200 OK` y agregando entradas en memoria (no persiste en disco).
+- Las rutas de imágenes `/asset/...` no existen en mock; las entradas simuladas usan URLs HTTP de ejemplo para que se muestren imágenes.
+
+Para desactivar el mock, elimina `?mock=1` de la URL.
+
 ## Copias de seguridad
 
 Haz copia de `/data/*.json` regularmente si añades muchas dimensiones/personajes.

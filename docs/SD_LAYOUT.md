@@ -11,8 +11,7 @@ Root of SD (ejemplo)
     style.css
   js/
     app.js
-  img/
-    placeholder.jpg   # opcional pero recomendado
+  img/                # (ya no se requiere placeholder local; se usan imágenes remotas de respaldo)
 /data/
   dimensions.json
   characters.json
