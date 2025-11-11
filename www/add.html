@@ -22,21 +22,9 @@
     </header>
 
     <main>
-      <section class="CharDetails" id="dimension-section">
-        <h2>Nueva dimensión</h2>
-        <form id="dimForm" class="form">
-          <input type="text" name="name" placeholder="Nombre" required />
-          <textarea name="description" placeholder="Descripción"></textarea>
-          <textarea name="history" placeholder="Historia"></textarea>
-          <input type="file" name="image" accept="image/*" required />
-          <small>La portada se ajustará a 16:9 automáticamente.</small>
-          <button type="submit" class="UpperButton">Crear dimensión</button>
-        </form>
-      </section>
-
       <section class="CharDetails" id="character-section">
-        <h2>Nuevo personaje</h2>
         <form id="charForm" class="form">
+          <h2>Nuevo personaje</h2>
           <input type="text" name="nombre" placeholder="Nombre" required />
           <label>
             Dimensión:
@@ -60,10 +48,22 @@
           />
           <button type="submit" class="UpperButton">Crear personaje</button>
         </form>
+
+        <!-- <section class="CharDetails" id="dimension-section"> -->
+        <section id="dimension-section">
+          <form id="dimForm" class="form">
+            <h2>Nueva categoria</h2>
+            <input type="text" name="name" placeholder="Nombre" required />
+            <textarea name="description" placeholder="Descripción"></textarea>
+            <textarea name="history" placeholder="Historia"></textarea>
+            <input type="file" name="image" accept="image/*" required />
+            <small>La portada se ajustará a 16:9 automáticamente.</small>
+            <button type="submit" class="UpperButton">Crear dimensión</button>
+          </form>
+        </section>
       </section>
     </main>
 
-    <script>(function(){ if(location.protocol==='file:') window.SAYDIM_MOCK = true; })();</script>
     <script src="js/mock.js"></script>
     <script src="js/app.js"></script>
   </body>
