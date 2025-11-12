@@ -37,10 +37,13 @@
             >La imagen se recortará a 1:1 y se comprimirá
             automáticamente.</small
           >
-          <textarea
-            name="powers"
-            placeholder='Poderes (JSON array). Ej: [{"nombre":"Fuego","descripcion":"Arde","daño":10}]'
-          ></textarea>
+          <div class="powersBuilder">
+            <button type="button" class="UpperButton" id="editPowersBtn">
+              Editar poderes
+            </button>
+            <small id="powersSummary">(0 poderes)</small>
+            <textarea name="powers" id="powersJson" hidden></textarea>
+          </div>
           <input
             type="text"
             name="comentarios"
@@ -62,6 +65,39 @@
           </form>
         </section>
       </section>
+      <div id="spinnerOverlay" style="display: none" aria-hidden="true">
+        <div class="spinner"></div>
+        <p>Cargando...</p>
+      </div>
+
+      <!-- Modal para construir poderes -->
+      <div
+        id="powersModal"
+        class="ModalOverlay"
+        style="display: none"
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="ModalContent">
+          <header class="ModalHeader">
+            <h3>Editar poderes</h3>
+          </header>
+          <div id="powersRows" class="PowersRows"></div>
+          <div class="ModalFooter">
+            <button type="button" class="UpperButton" id="addPowerRow">
+              + Agregar poder
+            </button>
+            <span class="ModalSpacer"></span>
+            <button type="button" class="UpperButton" id="cancelPowers">
+              Cancelar
+            </button>
+            <button type="button" class="UpperButton" id="savePowers">
+              Guardar
+            </button>
+          </div>
+        </div>
+      </div>
     </main>
 
     <script src="js/mock.js"></script>
