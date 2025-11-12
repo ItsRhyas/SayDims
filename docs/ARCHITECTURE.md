@@ -5,7 +5,7 @@
 SayDim está diseñado como una aplicación cliente/servidor ligera donde:
 
 - El servidor es el ESP32 con soporte para tarjeta microSD.
-- El cliente es una SPA (HTML/CSS/JS) servida desde la SD y consumida por el navegador.
+- El cliente es una app multipágina (HTML/CSS/JS) servida desde la SD y consumida por el navegador.
 
 ## Componentes
 
@@ -21,15 +21,14 @@ SayDim está diseñado como una aplicación cliente/servidor ligera donde:
 
 2. Interfaz web
 
-   - `www/index.html`: estructura y llamadas a la API.
-   - `www/css/style.css`, `www/js/app.js`: estilos y lógica cliente.
-   - Flujo: el JS carga `GET /api/dimensions` y `GET /api/characters` para rellenar UI; usa `/upload/*` para enviar formularios con archivos.
+   - Páginas: `index.html`, `dimension.html`, `character.html`, `add.html`.
+   - Estilos y scripts: `www/css/styles.css`, `www/js/app.js`, `www/js/mock.js`.
+   - Flujo: el JS consume `GET /api/dimensions` y `GET /api/characters` y usa `/upload/*` para enviar formularios con archivos. En `add.html`, un popup construye el JSON de poderes.
 
 3. Tarjeta SD
    - Debe contener al menos:
-     - `/www/index.html`
-     - `/www/css/style.css`
-     - `/www/js/app.js`
+     - `/www/index.html`, `/www/dimension.html`, `/www/character.html`, `/www/add.html`
+     - `/www/css/styles.css`, `/www/js/app.js`, `/www/js/mock.js`
      - `/data/*.json` (inicializados si vacíos)
      - `/dimensions/` y `/characters/` (imágenes subidas)
 
@@ -42,6 +41,7 @@ SayDim está diseñado como una aplicación cliente/servidor ligera donde:
 
 - Servir archivos desde SD reduce la memoria ocupada en la flash del ESP y facilita actualizar la UI sin recompilar.
 - Se soporta `/asset/` para diferenciar recursos que vienen del almacenamiento (imágenes subidas) de los fijos en `/www`.
+- En el cliente, las imágenes se recomprimen (JPEG) y se recortan a la relación de aspecto esperada antes de subir para reducir tamaño.
 - El código prioriza simplicidad y trazabilidad (varias salidas Serial para debugging).
 
 ## Limitaciones

@@ -7,11 +7,15 @@ Root of SD (ejemplo)
 ```
 /www/
   index.html
+  dimension.html
+  character.html
+  add.html
   css/
-    style.css
+    styles.css
   js/
     app.js
-  img/                # (ya no se requiere placeholder local; se usan imágenes remotas de respaldo)
+    mock.js
+  img/
 /data/
   dimensions.json
   characters.json

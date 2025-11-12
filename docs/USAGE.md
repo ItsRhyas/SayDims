@@ -30,6 +30,8 @@
 ## Subir imágenes desde la web
 
 - Usa los formularios en la UI (para dimensiones y personajes). Las peticiones `POST /upload/*` guardan imágenes y actualizan los JSON en `/data`.
+- En Agregar personaje, usa el botón "Editar poderes" para abrir un popup que permite añadir/eliminar poderes y traducirlos a JSON automáticamente (sin escribirlo a mano). Al guardar, verás un contador de poderes.
+- Durante el envío se muestra un spinner de progreso; las imágenes se recomprimen automáticamente (16:9 para dimensiones, 1:1 para personajes) antes de subir.
 
 ## Pruebas locales
 
@@ -56,6 +58,7 @@ Qué hace el modo mock:
 - Responde a `GET /api/status`, `GET /api/dimensions`, `GET /api/characters` con datos simulados en memoria.
 - Simula `POST /upload/dimension` y `POST /upload/character` devolviendo `200 OK` y agregando entradas en memoria (no persiste en disco).
 - Las rutas de imágenes `/asset/...` no existen en mock; las entradas simuladas usan URLs HTTP de ejemplo para que se muestren imágenes.
+- El constructor de poderes también funciona en modo mock; los datos se insertan en el objeto ficticio que devuelve la API.
 
 Para desactivar el mock, elimina `?mock=1` de la URL.
 
