@@ -240,20 +240,63 @@ function setupAddPage() {
           method: "POST",
           body: fd,
         });
-        let data = null;
+        if (!res.ok) {
+          hideSpinner();
+          if (res.status === 409) {
+            alert("Este personaje ya existe en esta dimensión");
+            return;
+          }
+          if (res.status === 400) {
+            alert("La dimensión no existe o es inválida");
+            return;
+          }
+          if (res.status === 503) {
+            alert("La tarjeta SD no está disponible");
+            return;
+          }
+          alert("Error creando personaje: HTTP " + res.status);
+          return;
+        }
+        // Robust response parsing (JSON or text)
+        let data = null,
+          textBody = null;
         try {
-          data = await res.json();
-        } catch {}
+          data = await res.clone().json();
+        } catch {
+          try {
+            textBody = await res.text();
+            data = JSON.parse(textBody);
+          } catch {
+            /* keep null */
+          }
+        }
         hideSpinner();
-        if (!res.ok || !data || !data.ok) {
+        // Accept 200 even if body couldn't be parsed; try to extract id from text
+        const fallbackOk = res.ok && (!data || data.ok === undefined);
+        if (!res.ok || (!fallbackOk && (!data || !data.ok))) {
           alert(
             "Error creando personaje: " +
               (data && data.error ? data.error : "HTTP " + res.status)
           );
           return;
         }
-        alert("Personaje creado ✔ ID: " + data.id);
-        location.href = "character.html?id=" + encodeURIComponent(data.id);
+        const newId =
+          data && data.id
+            ? data.id
+            : (() => {
+                try {
+                  const m = (textBody || "").match(/"id"\s*:\s*"([^"]+)"/);
+                  return m ? m[1] : null;
+                } catch {
+                  return null;
+                }
+              })();
+        alert("Personaje creado ✔" + (newId ? " ID: " + newId : ""));
+        if (newId) {
+          location.href = "character.html?id=" + encodeURIComponent(newId);
+        } else {
+          location.href = "index.html";
+        }
       } catch (err) {
         hideSpinner();
         console.error("Char upload error", err);
@@ -289,26 +332,61 @@ function setupAddPage() {
           method: "POST",
           body: fd,
         });
-        let data = null;
+        if (!res.ok) {
+          hideSpinner();
+          if (res.status === 409) {
+            alert("La dimensión ya existe");
+            return;
+          }
+          if (res.status === 503) {
+            alert("La tarjeta SD no está disponible");
+            return;
+          }
+          alert("Error creando dimensión: HTTP " + res.status);
+          return;
+        }
+        let data = null,
+          textBody = null;
         try {
-          data = await res.json();
-        } catch {}
+          data = await res.clone().json();
+        } catch {
+          try {
+            textBody = await res.text();
+            data = JSON.parse(textBody);
+          } catch {}
+        }
         hideSpinner();
-        if (!res.ok || !data || !data.ok) {
+        const fallbackOk = res.ok && (!data || data.ok === undefined);
+        if (!res.ok || (!fallbackOk && (!data || !data.ok))) {
           alert(
             "Error creando dimensión: " +
               (data && data.error ? data.error : "HTTP " + res.status)
           );
           return;
         }
-        alert("Dimensión creada ✔ ID: " + data.id);
+        const newDimId =
+          data && data.id
+            ? data.id
+            : (() => {
+                try {
+                  const m = (textBody || "").match(/"id"\s*:\s*"([^"]+)"/);
+                  return m ? m[1] : null;
+                } catch {
+                  return null;
+                }
+              })();
+        alert("Dimensión creada ✔" + (newDimId ? " ID: " + newDimId : ""));
         if (dimSelect) {
           const opt = document.createElement("option");
-          opt.value = data.id;
-          opt.textContent = name || data.id;
+          opt.value = newDimId || name || "";
+          opt.textContent = name || newDimId || "";
           dimSelect.appendChild(opt);
         }
-        location.href = "dimension.html?id=" + encodeURIComponent(data.id);
+        if (newDimId) {
+          location.href = "dimension.html?id=" + encodeURIComponent(newDimId);
+        } else {
+          location.href = "index.html";
+        }
       } catch (err) {
         hideSpinner();
         console.error("Dim upload error", err);
@@ -669,5 +747,36 @@ function blobToImage(file) {
       reject(e);
     };
     img.src = url;
+  });
+}
+
+// Convert canvas to Blob with broad browser support
+function canvasToBlob(canvas, type = "image/jpeg", quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    try {
+      if (canvas.toBlob) {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error("canvas.toBlob returned null"));
+          },
+          type,
+          quality
+        );
+      } else {
+        // Fallback via dataURL
+        const dataURL = canvas.toDataURL(type, quality);
+        const parts = dataURL.split(",");
+        const mimeMatch = parts[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : type;
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) u8arr[n] = bstr.charCodeAt(n);
+        resolve(new Blob([u8arr], { type: mime }));
+      }
+    } catch (e) {
+      reject(e);
+    }
   });
 }

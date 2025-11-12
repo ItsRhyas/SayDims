@@ -7,6 +7,14 @@ SayDim está diseñado como una aplicación cliente/servidor ligera donde:
 - El servidor es el ESP32 con soporte para tarjeta microSD.
 - El cliente es una app multipágina (HTML/CSS/JS) servida desde la SD y consumida por el navegador.
 
+## Diagramas
+
+Diagrama de clases
+![alt text](image.png)
+
+Diagrama de casos de uso
+![alt text](image-1.png)
+
 ## Componentes
 
 1. Firmware (ESP32)
