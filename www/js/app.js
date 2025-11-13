@@ -2,6 +2,205 @@
 // Multi-page initialization, data loading, uploads, and UI helpers.
 
 // ---- Page Detection & Bootstrap ----
+
+// Minimal global spinner helpers (work on any page with #spinnerOverlay)
+function showSpinnerOverlay(msg) {
+  const ov = document.getElementById("spinnerOverlay");
+  if (!ov) return;
+  ov.style.display = "flex";
+  const p = ov.querySelector("p");
+  if (p && msg) p.textContent = msg;
+}
+function hideSpinnerOverlay() {
+  const ov = document.getElementById("spinnerOverlay");
+  if (ov) ov.style.display = "none";
+}
+
+// ---- IndexedDB (offline cache for JSON + images) ----
+const IDB_NAME = "saydim-db";
+const IDB_VERSION = 1;
+function openIDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("dimensions"))
+        db.createObjectStore("dimensions", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("characters"))
+        db.createObjectStore("characters", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("images"))
+        db.createObjectStore("images"); // key: path (e.g., /characters/xxx.jpg)
+      if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbPut(store, key, value) {
+  const db = await openIDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).put(value, key);
+    tx.oncomplete = () => res(true);
+    tx.onerror = () => rej(tx.error);
+  });
+}
+async function idbPutObj(store, obj) {
+  const db = await openIDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).put(obj);
+    tx.oncomplete = () => res(true);
+    tx.onerror = () => rej(tx.error);
+  });
+}
+async function idbGet(store, key) {
+  const db = await openIDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, "readonly");
+    const r = tx.objectStore(store).get(key);
+    r.onsuccess = () => res(r.result || null);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function idbGetAll(store) {
+  const db = await openIDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, "readonly");
+    const r = tx.objectStore(store).getAll();
+    r.onsuccess = () => res(r.result || []);
+    r.onerror = () => rej(r.error);
+  });
+}
+
+// Store/retrieve image blobs by path
+function normalizeAssetPath(p) {
+  if (!p) return null;
+  let s = String(p).trim();
+  if (s.startsWith("/asset/")) s = s.slice(6); // strip '/asset'
+  if (!s.startsWith("/")) s = "/" + s; // ensure leading slash
+  s = s.replace(/\/+/, "/");
+  return s;
+}
+async function cacheImage(path, blob) {
+  try {
+    const key = normalizeAssetPath(path);
+    if (!key) return;
+    await idbPut("images", key, blob);
+  } catch (e) {
+    console.warn("cacheImage failed", e);
+  }
+}
+async function getCachedImageURL(path) {
+  try {
+    const key = normalizeAssetPath(path);
+    if (!key) return null;
+    const b = await idbGet("images", key);
+    if (b) {
+      return URL.createObjectURL(b);
+    }
+  } catch (e) {}
+  return null;
+}
+
+// Decide the best image source; prefer cached blob when present
+async function attachImage(imgEl, assetPath) {
+  if (!imgEl || !assetPath) return;
+  try {
+    const cached = await getCachedImageURL(assetPath);
+    if (cached) {
+      imgEl.src = cached;
+      return;
+    }
+    // Network path as fallback
+    const norm = normalizeAssetPath(assetPath);
+    if (navigator.onLine) {
+      imgEl.src = "/asset" + norm;
+      imgEl.onerror = async () => {
+        const again = await getCachedImageURL(assetPath);
+        if (again) {
+          imgEl.onerror = null;
+          imgEl.src = again;
+        } else {
+          imgEl.style.display = "none";
+        }
+      };
+    } else {
+      imgEl.style.display = "none";
+    }
+  } catch (e) {
+    imgEl.style.display = "none";
+  }
+}
+
+// Perform a manual sync: fetch JSON and images, store to IDB
+async function performSync() {
+  try {
+    showSpinnerOverlay("Sincronizando...");
+    // Fetch and store dimensions
+    let dims = [];
+    try {
+      dims = await fetchJSON("/api/dimensions");
+    } catch {
+      dims = [];
+    }
+    if (Array.isArray(dims)) {
+      for (const d of dims) {
+        try {
+          await idbPutObj("dimensions", d);
+        } catch {}
+      }
+      // Cache dimension images
+      for (const d of dims) {
+        if (d.image) {
+          try {
+            const norm = normalizeAssetPath(d.image);
+            const resp = await fetch("/asset" + norm, { cache: "no-store" });
+            if (resp.ok) {
+              const blob = await resp.blob();
+              await cacheImage(norm, blob);
+            }
+          } catch {}
+        }
+      }
+    }
+    // Fetch and store characters
+    let chars = [];
+    try {
+      chars = await fetchJSON("/api/characters");
+    } catch {
+      chars = [];
+    }
+    if (Array.isArray(chars)) {
+      for (const c of chars) {
+        try {
+          await idbPutObj("characters", c);
+        } catch {}
+      }
+      for (const c of chars) {
+        if (c.foto) {
+          try {
+            const norm = normalizeAssetPath(c.foto);
+            const resp = await fetch("/asset" + norm, { cache: "no-store" });
+            if (resp.ok) {
+              const blob = await resp.blob();
+              await cacheImage(norm, blob);
+            }
+          } catch {}
+        }
+      }
+    }
+    const ts = Date.now();
+    await idbPut("meta", "lastSync", ts);
+    try {
+      updateLastSyncUI(ts);
+    } catch {}
+  } finally {
+    hideSpinnerOverlay();
+  }
+}
+// Expose for inline onclick in HTML
+window.performSync = performSync;
 function detectPage() {
   // Prefer explicit data-page marker if present
   const bodyPage = document.body?.dataset?.page;
@@ -19,6 +218,13 @@ document.addEventListener("DOMContentLoaded", () => {
   if (page === "index") {
     loadDims();
     loadRecentCharacters();
+    // Show last sync time if available
+    (async () => {
+      try {
+        const ts = await idbGet("meta", "lastSync");
+        updateLastSyncUI(ts);
+      } catch {}
+    })();
   } else if (page === "dimension") {
     initDimensionPage();
   } else if (page === "character") {
@@ -27,6 +233,25 @@ document.addEventListener("DOMContentLoaded", () => {
     setupAddPage();
   }
 });
+
+function updateLastSyncUI(ts) {
+  const el = document.getElementById("lastSync");
+  if (!el) return;
+  if (!ts) {
+    el.textContent = "Sin sincronizar";
+    return;
+  }
+  try {
+    const d = new Date(Number(ts));
+    if (!isNaN(d)) {
+      el.textContent = "Última sync: " + d.toLocaleString();
+    } else {
+      el.textContent = "Última sync: -";
+    }
+  } catch {
+    el.textContent = "Última sync: -";
+  }
+}
 
 // Populate dimension dropdown and wire upload forms on add page
 function setupAddPage() {
@@ -426,14 +651,9 @@ async function initDimensionPage() {
         p.textContent = dim.nombre || dim.name || "Sin nombre";
         const img = document.createElement("img");
         img.className = "BannerImg";
-        img.src = dim.image?.startsWith("http")
-          ? dim.image
-          : `/asset${dim.image}`;
         img.alt = p.textContent;
-        img.onerror = () => {
-          img.onerror = null;
-          img.src = `https://picsum.photos/seed/dim-${dim.id}/800/450`;
-        };
+        // Prefer cached image; do not use remote placeholder offline
+        attachImage(img, dim.image);
         a.appendChild(p);
         a.appendChild(img);
         section.appendChild(a);
@@ -458,9 +678,28 @@ async function initDimensionPage() {
 
 // ---- Fetch & Utility Helpers ----
 async function fetchJSON(url) {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  return res.json();
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+    return await res.json();
+  } catch (err) {
+    // Offline fallback via IndexedDB for API data
+    try {
+      const u = new URL(url, location.origin);
+      if (u.pathname === "/api/dimensions") {
+        return await idbGetAll("dimensions");
+      }
+      if (u.pathname === "/api/characters") {
+        const all = await idbGetAll("characters");
+        const dim = u.searchParams.get("dim");
+        if (dim) {
+          return all.filter((c) => String(c.dimension) === String(dim));
+        }
+        return all;
+      }
+    } catch {}
+    throw err;
+  }
 }
 
 function escapeHTML(str) {
@@ -504,12 +743,9 @@ function updateDimensionsUI(dims) {
     p.textContent = dim.nombre || dim.name || "(Sin nombre)";
     const img = document.createElement("img");
     img.className = "BannerImg";
-    img.src = dim.image?.startsWith("http") ? dim.image : `/asset${dim.image}`;
     img.alt = p.textContent;
-    img.onerror = () => {
-      img.onerror = null;
-      img.src = `https://picsum.photos/seed/dim-${dim.id}/800/450`;
-    };
+    // Prefer cached image; if none, try network, else hide (no remote placeholder offline)
+    attachImage(img, dim.image);
     link.appendChild(p);
     link.appendChild(img);
     banner.appendChild(link);
@@ -557,12 +793,8 @@ function updateCharactersUI(chars) {
     );
     const img = document.createElement("img");
     img.className = "CharImg";
-    img.src = char.foto?.startsWith("http") ? char.foto : `/asset${char.foto}`;
     img.alt = char.nombre || "Personaje";
-    img.onerror = () => {
-      img.onerror = null;
-      img.src = `https://picsum.photos/seed/char-${char.id}/80/80`;
-    };
+    attachImage(img, char.foto);
     const p = document.createElement("p");
     p.className = "CharName";
     p.textContent = char.nombre || "Sin nombre";
@@ -635,21 +867,17 @@ async function initCharacterPage() {
             const ovDim = escapeHTML(
               ov.dimensionName || ov.dimension || "Otra dimensión"
             );
-            const foto = ov.foto?.startsWith("http")
-              ? ov.foto
-              : `/asset${ov.foto}`;
+            const fotoPath = ov.foto || "";
             return (
               '<a class="CharacterInList" href="character.html?id=' +
               encodeURIComponent(ov.id) +
               '" aria-label="Ver versión ' +
               escapeHTML(ov.nombre) +
-              ' en otra dimensión"><img class="CharImg" src="' +
-              foto +
+              ' en otra dimensión"><img class="CharImg" data-asset="' +
+              escapeHTML(fotoPath) +
               '" alt="' +
               escapeHTML(ov.nombre || "Personaje") +
-              '" onerror="this.onerror=null;this.src=\'https://picsum.photos/seed/char-' +
-              ov.id +
-              '/80/80\'" /><p class="CharName">' +
+              '" /><p class="CharName">' +
               ovDim +
               "</p></a>"
             );
@@ -657,9 +885,6 @@ async function initCharacterPage() {
           .join("") +
         "</div>";
     }
-    const foto = char.foto?.startsWith("http")
-      ? char.foto
-      : `/asset${char.foto}`;
     const container = document.getElementById("character-detail");
     if (!container) return;
     const statsRows = [
@@ -684,11 +909,9 @@ async function initCharacterPage() {
       <section class="CharDetails" aria-labelledby="char-name" data-id="${escapeHTML(
         String(char.id)
       )}">
-        <img class="CharMainImg" src="${foto}" alt="${escapeHTML(
-      char.nombre || "Personaje"
-    )}" onerror="this.onerror=null;this.src='https://picsum.photos/seed/char-${
-      char.id
-    }/300/300'" />
+        <img class="CharMainImg" alt="${escapeHTML(
+          char.nombre || "Personaje"
+        )}" id="char-main-img" />
         <h2 id="char-name" class="CharName">${escapeHTML(
           char.nombre || "Sin nombre"
         )}</h2>
@@ -703,6 +926,15 @@ async function initCharacterPage() {
         ${versionsHTML}
       </section>`;
     container.innerHTML = html;
+    // Attach image (prefer cached blob)
+    const mainImg = document.getElementById("char-main-img");
+    if (mainImg) attachImage(mainImg, char.foto);
+    // Attach images for other versions list
+    const ovImgs = container.querySelectorAll(".CharList img[data-asset]");
+    ovImgs.forEach((im) => {
+      const ap = im.getAttribute("data-asset");
+      if (ap) attachImage(im, ap);
+    });
   } catch (e) {
     console.error("Init character error", e);
   }
