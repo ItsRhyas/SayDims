@@ -111,8 +111,19 @@ function setupAddPage() {
       .map((p) => ({
         nombre: p.nombre.trim(),
         descripcion: p.descripcion.trim(),
-        daño: p.daño === "" ? undefined : Number(p.daño),
-        cooldown: p.cooldown === "" ? undefined : Number(p.cooldown),
+        // keep daño and cooldown as strings when present
+        daño:
+          p.daño == null
+            ? undefined
+            : String(p.daño).trim() === ""
+            ? undefined
+            : String(p.daño),
+        cooldown:
+          p.cooldown == null
+            ? undefined
+            : String(p.cooldown).trim() === ""
+            ? undefined
+            : String(p.cooldown),
       }))
       .filter((p) => p.nombre.length > 0);
     powersJson.value = JSON.stringify(cleaned);

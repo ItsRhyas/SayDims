@@ -10,10 +10,10 @@ SayDim está diseñado como una aplicación cliente/servidor ligera donde:
 ## Diagramas
 
 Diagrama de clases
-![alt text](image.png)
+![alt text](CasosDeUso.png)
 
 Diagrama de casos de uso
-![alt text](image-1.png)
+![alt text](CasosDeUso.png)
 
 ## Componentes
 
