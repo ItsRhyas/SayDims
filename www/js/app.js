@@ -77,10 +77,10 @@ function setupAddPage() {
         <input type="text" placeholder="Nombre" value="${escapeHTML(
           p.nombre
         )}" data-field="nombre" data-idx="${idx}" />
-        <input type="number" placeholder="Daño" value="${escapeHTML(
+        <input type="text" placeholder="Daño" value="${escapeHTML(
           p.daño
         )}" data-field="daño" data-idx="${idx}" />
-        <input type="number" placeholder="Cooldown" value="${escapeHTML(
+        <input type="text" placeholder="Usos/CoolDown" value="${escapeHTML(
           p.cooldown
         )}" data-field="cooldown" data-idx="${idx}" />
         <textarea placeholder="Descripción" data-field="descripcion" data-idx="${idx}">${escapeHTML(
@@ -699,7 +699,7 @@ async function initCharacterPage() {
           ""
         )}</tbody></table>
         <h3>Habilidades ⚡</h3>
-        <table class="Powers" aria-label="Poderes del personaje"><thead><tr><th>Nombre</th><th>Daño</th><th>Cooldown</th></tr></thead><tbody>${powersRows}</tbody></table>
+        <table class="Powers" aria-label="Poderes del personaje"><thead><tr><th>Nombre</th><th>Daño</th><th>Usos/CoolDown</th></tr></thead><tbody>${powersRows}</tbody></table>
         ${versionsHTML}
       </section>`;
     container.innerHTML = html;
