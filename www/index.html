@@ -1,83 +1,38 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Dimensiones & Personajes</title>
-    <link rel="stylesheet" href="css/style.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SayDim • Dimensiones y Personajes</title>
+    <link rel="stylesheet" href="css/styles.css" />
   </head>
-  <body>
-    <div class="sidebar">
-      <h3>Dimensiones</h3>
-      <div id="sidebarList"></div>
-      <hr />
-      <button onclick="showNewDimension()">Nueva Dimensión</button>
-      <div id="newDimForm" style="display: none">
-        <form id="dimForm">
-          <input name="name" placeholder="Nombre" required /><br />
-          <textarea name="description" placeholder="Descripción"></textarea
-          ><br />
-          <textarea name="history" placeholder="Historia"></textarea><br />
-          <input type="file" name="image" accept="image/*" required /><br />
-          <button type="submit">Crear</button>
-        </form>
-      </div>
-    </div>
+  <body data-page="index">
+    <header>
+      <button class="UpperButton" title="Menú">
+        <span aria-hidden="true">≡</span>
+      </button>
+      <h1>SayDims</h1>
+      <button
+        class="UpperButton"
+        title="Agregar"
+        onclick="location.href='add.html'"
+      >
+        <span aria-hidden="true">＋</span>
+      </button>
+    </header>
 
-    <div class="main">
-      <h1>Dimensiones</h1>
+    <nav>
       <div id="dims"></div>
-      <hr />
-      <h2>Personajes</h2>
-      <div>
-        <form id="charFilter">
-          <label
-            >Dimensión:
-            <select id="filterDim">
-              <option value="">--Todas--</option>
-            </select>
-          </label>
-          <label
-            >Orden:
-            <select id="sortField">
-              <option value="">----</option>
-              <option value="name">Nombre</option>
-              <option value="vida">Vida</option>
-              <option value="created">Creado</option>
-            </select>
-          </label>
-          <label
-            >Dir:
-            <select id="sortDir">
-              <option value="asc">Asc</option>
-              <option value="desc">Desc</option>
-            </select>
-          </label>
-          <button type="button" onclick="loadCharacters()">Aplicar</button>
-        </form>
-      </div>
-      <div id="characters"></div>
+    </nav>
 
-      <hr />
-      <h3>Crear personaje</h3>
-      <form id="charForm" class="form">
-        <input name="nombre" placeholder="Nombre" required /><br />
-        <label
-          >Dimension:
-          <select name="dimension" id="charDim" required></select></label
-        ><br />
-        <input name="vida" type="number" placeholder="Vida" /><br />
-        <textarea name="descripcion" placeholder="Descripción"></textarea><br />
-        <input type="file" name="foto" accept="image/*" required /><br />
-        <textarea
-          name="powers"
-          placeholder='Poderes (JSON array). Ej: [{"nombre":"Fuego","descripcion":"Arde","daño":10}]'
-        ></textarea
-        ><br />
-        <input name="comentarios" placeholder="Comentarios extra" /><br />
-        <button type="submit">Crear personaje</button>
-      </form>
-    </div>
+    <main>
+      <h3>Todos los Personajes</h3>
+      <div id="characters"></div>
+      <div id="spinnerOverlay" style="display: none" aria-hidden="true">
+        <div class="spinner"></div>
+        <p>Cargando...</p>
+      </div>
+    </main>
 
     <div
       id="sdcardError"
@@ -87,16 +42,18 @@
         top: 10px;
         right: 10px;
         background: #ff4444;
-        color: white;
-        padding: 15px;
-        border-radius: 5px;
+        color: #fff;
+        padding: 12px 16px;
+        border-radius: 6px;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
       "
+      role="alert"
     >
-      Error: No se detectó la tarjeta SD. Por favor, inserte una tarjeta SD y
-      recargue la página.
+      Error: No se detectó la tarjeta SD. Inserte una tarjeta SD y recargue la
+      página.
     </div>
 
+    <script src="js/mock.js"></script>
     <script src="js/app.js"></script>
   </body>
 </html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agregar • SayDim</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body data-page="add">
+    <header>
+      <button
+        class="UpperButton"
+        onclick="location.href='index.html'"
+        title="Inicio"
+      >
+        ⌂
+      </button>
+      <h1>Agregar</h1>
+      <span class="UpperButton" aria-hidden="true" style="opacity: 0.3"></span>
+    </header>
+
+    <main>
+      <section class="CharDetails" id="character-section">
+        <form id="charForm" class="form">
+          <h2>Nuevo personaje</h2>
+          <input type="text" name="nombre" placeholder="Nombre" required />
+          <label>
+            Dimensión:
+            <select name="dimension" id="charDim" required></select>
+          </label>
+          <input type="number" name="vida" placeholder="Vida" />
+          <textarea name="descripcion" placeholder="Descripción"></textarea>
+          <input type="file" name="foto" accept="image/*" required />
+          <small
+            >La imagen se recortará a 1:1 y se comprimirá
+            automáticamente.</small
+          >
+          <div class="powersBuilder">
+            <button type="button" class="UpperButton" id="editPowersBtn">
+              Editar poderes
+            </button>
+            <small id="powersSummary">(0 poderes)</small>
+            <textarea name="powers" id="powersJson" hidden></textarea>
+          </div>
+          <input
+            type="text"
+            name="comentarios"
+            placeholder="Comentarios extra"
+          />
+          <button type="submit" class="UpperButton">Crear personaje</button>
+        </form>
+
+        <!-- <section class="CharDetails" id="dimension-section"> -->
+        <section id="dimension-section">
+          <form id="dimForm" class="form">
+            <h2>Nueva categoria</h2>
+            <input type="text" name="name" placeholder="Nombre" required />
+            <textarea name="description" placeholder="Descripción"></textarea>
+            <textarea name="history" placeholder="Historia"></textarea>
+            <input type="file" name="image" accept="image/*" required />
+            <small>La portada se ajustará a 16:9 automáticamente.</small>
+            <button type="submit" class="UpperButton">Crear dimensión</button>
+          </form>
+        </section>
+      </section>
+      <div id="spinnerOverlay" style="display: none" aria-hidden="true">
+        <div class="spinner"></div>
+        <p>Cargando...</p>
+      </div>
+
+      <!-- Modal para construir poderes -->
+      <div
+        id="powersModal"
+        class="ModalOverlay"
+        style="display: none"
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="ModalContent">
+          <header class="ModalHeader">
+            <h3>Editar poderes</h3>
+          </header>
+          <div id="powersRows" class="PowersRows"></div>
+          <div class="ModalFooter">
+            <button type="button" class="UpperButton" id="addPowerRow">
+              + Agregar poder
+            </button>
+            <span class="ModalSpacer"></span>
+            <button type="button" class="UpperButton" id="cancelPowers">
+              Cancelar
+            </button>
+            <button type="button" class="UpperButton" id="savePowers">
+              Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="js/mock.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

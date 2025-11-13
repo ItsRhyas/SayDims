@@ -1,0 +1,335 @@
+/* La pc lo lee */
+
+body {
+  background-color: #000;
+  font-family: Arial, sans-serif;
+  color: #ffffff;
+  margin: 5px;
+}
+
+/* Spinner overlay */
+#spinnerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 9999;
+  flex-direction: column;
+}
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Modal Powers Builder */
+.ModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 1rem;
+}
+.ModalContent {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  width: min(900px, 100%);
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 0 2px #222, 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+.ModalHeader {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #333;
+}
+.ModalHeader h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.PowersRows {
+  padding: 0.75rem 1rem;
+  overflow-y: auto;
+  flex: 1;
+}
+.PowerRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.5rem;
+  background: #252525;
+  padding: 0.75rem;
+  border: 1px solid #333;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+.PowerRow input,
+.PowerRow textarea {
+  width: 100%;
+  background: #181818;
+  border: 1px solid #444;
+  color: #eee;
+  padding: 0.4rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+.PowerRow textarea {
+  resize: vertical;
+  min-height: 56px;
+}
+.RemovePowerBtn {
+  background: #3a0000;
+  color: #f55;
+  border: 1px solid #600;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  align-self: start;
+  font-size: 0.75rem;
+}
+.RemovePowerBtn:hover {
+  background: #550000;
+}
+.ModalFooter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #333;
+  flex-wrap: wrap;
+}
+.ModalSpacer {
+  flex: 1;
+}
+.powersBuilder {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+#powersSummary {
+  color: #aaa;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 700px) {
+  .PowerRow {
+    grid-template-columns: 1fr;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+header {
+  padding: 10px;
+  align-items: center;
+  justify-content: space-between;
+  display: flex;
+  flex-direction: row;
+  text-align: center;
+  font-size: medium;
+}
+
+h1 {
+  font-size: 25px;
+}
+
+h3 {
+  padding-left: 10px;
+}
+
+nav {
+  display: block;
+  border-top: solid 1px #c0c0c0;
+  border-bottom: solid 1px #c0c0c0;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.Banner {
+  background-color: #333333;
+  aspect-ratio: 16/9;
+  margin: 10px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  position: relative; /* contenedor posicionado */
+  overflow: hidden; /* recorta la imagen dentro del banner */
+}
+
+.BannerImg {
+  position: absolute;
+  inset: 0; /* top:0; right:0; bottom:0; left:0 */
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* llena el contenedor manteniendo proporción */
+  display: block;
+  z-index: 0;
+}
+
+.NombreDim {
+  color: #fff;
+  position: relative;
+  z-index: 1; /* para que el texto esté encima de la imagen */
+  background-color: #000000a0;
+  font-weight: bold;
+  padding: 0.5rem 3rem; /* espacio alrededor del texto */
+  font-size: clamp(0.8rem, 1.7rem, 2.4rem);
+  border-radius: 8px;
+}
+
+.CharList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  justify-content: center;
+}
+
+.CharacterInList {
+  display: flex;
+  flex-direction: row;
+}
+
+.CharName {
+  color: #ffffff;
+  display: flex;
+  text-align: center;
+  align-items: center;
+  margin: 0px 10px 0px 10px;
+}
+
+.CharImg {
+  width: 30px;
+  height: 30px;
+  border-radius: 15px;
+}
+
+.UpperButton {
+  background-color: #000000;
+  color: #ffffff;
+  border: solid 1px #c0c0c0;
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.CharMainImg {
+  width: 200px;
+  height: 200px;
+  border-radius: 100px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 20px;
+}
+
+.CharDetails {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-top: 10px;
+  font-size: 18px;
+  margin: 20px;
+}
+
+/* Tablas de detalles y poderes */
+.CharStats,
+.Powers {
+  width: 100%;
+  border-collapse: collapse; /* colapsar bordes para que se vea uno solo */
+  margin-top: 10px;
+}
+
+.CharStats th,
+.CharStats td,
+.Powers th,
+.Powers td {
+  border: 1px solid #c0c0c0; /* bordes visibles */
+  padding: 8px 10px;
+}
+
+/* Alineación por columnas */
+.CharStats th {
+  text-align: left; /* columna izquierda */
+}
+.CharStats td {
+  text-align: right; /* columna derecha */
+}
+
+/* En Powers: izquierda a la izquierda, derecha a la derecha */
+.Powers th:first-child,
+.Powers td:first-child {
+  text-align: left;
+}
+.Powers th:nth-child(2),
+.Powers td:nth-child(2),
+.Powers th:nth-child(3),
+.Powers td:nth-child(3) {
+  text-align: right; /* daño y cooldown a la derecha */
+}
+
+/* Fila de descripción del poder debajo del nombre */
+.PowerName {
+  font-weight: 600;
+}
+.PowerDescription {
+  font-size: 0.85em;
+  color: #c0c0c0;
+  text-align: left;
+  background: #111111;
+}
+
+/* quitar subrayado y heredar color para enlaces dentro de .Banner */
+.Banner a,
+.Banner a:link,
+.Banner a:visited,
+.Banner a:hover,
+.Banner a:active {
+  text-decoration: none;
+  color: inherit;
+  display: block; /* permite que el enlace ocupe todo el banner */
+}
+
+/* enlaces dentro de la lista de personajes: quitar subrayado, heredar color
+   y conservar layout flex (no usar display:block aquí porque .CharacterInList usa flex) */
+.CharList a,
+.CharList a:link,
+.CharList a:visited,
+.CharList a:hover,
+.CharList a:active {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  align-items: center;
+}
+
+/* mantener accesibilidad: foco visible para ambos casos */
+.Banner a:focus,
+.CharList a:focus {
+  outline: 3px solid rgba(255, 255, 255, 0.2);
+  outline-offset: 4px;
+}

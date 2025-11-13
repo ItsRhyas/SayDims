@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Personaje • SayDim</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body data-page="character">
+    <header>
+      <button
+        class="UpperButton"
+        onclick="location.href='index.html'"
+        title="Inicio"
+      >
+        ⌂
+      </button>
+      <h1>Personaje</h1>
+      <button
+        class="UpperButton"
+        onclick="location.href='add.html'"
+        title="Agregar"
+      >
+        ＋
+      </button>
+    </header>
+    <main>
+      <div id="character-detail"></div>
+      <div id="spinnerOverlay" style="display: none" aria-hidden="true">
+        <div class="spinner"></div>
+        <p>Cargando...</p>
+      </div>
+    </main>
+    <script src="js/mock.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
