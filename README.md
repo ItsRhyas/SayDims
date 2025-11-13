@@ -4,7 +4,7 @@ Aplicación web ligera para ESP32 que gestiona Dimensiones y Personajes desde un
 
 ## Planteamiento
 
-Hasta el momento, había trabajado únicamente en repositorios privados para proyectos universitarios. Me propuse iniciar un proyecto personal que pudiera publicar y decidí desarrollarlo pensando en mi hermano menor. Se trata de una plataforma en la que él pueda acceder a la información de los personajes que posee como minifiguras, así como a las características que les atribuye al jugar. Anteriormente, él utilizaba un chat de WhatsApp para registrar estos datos, pero con esta plataforma podrá acceder a ellos de manera más cómoda y estructurada. A continuacion un ejemplo cos dos personajes de dos dimensiones distintas:
+Hasta el momento, había trabajado únicamente en repositorios privados para proyectos universitarios. Me propuse iniciar un proyecto personal que pudiera publicar y decidí desarrollarlo pensando en mi hermano menor. Se trata de una plataforma en la que él pueda acceder a la información de los personajes que posee como minifiguras, así como a las características que les atribuye al jugar. Anteriormente, él utilizaba un chat de WhatsApp para registrar estos datos, pero con esta plataforma podrá acceder a ellos de manera más cómoda y estructurada. A continuación, un ejemplo con dos personajes de dos dimensiones distintas:
 
 ![alt text](vistas.png)
 
@@ -15,6 +15,7 @@ Hasta el momento, había trabajado únicamente en repositorios privados para pro
 - Creador visual de poderes (popup) en “Agregar personaje” con filas dinámicas.
 - Subida de imágenes optimizada en el cliente (recorte/escala y compresión JPEG) antes de enviar.
 - API REST sencilla en el ESP32 para listar y crear recursos.
+- Modo offline: tras sincronizar, la app funciona sin conexión leyendo datos e imágenes del caché local.
 
 ## Requisitos
 
@@ -146,7 +147,7 @@ Guía detallada: `docs/TROUBLESHOOTING.md`.
 
 ## Licencia
 
-Añade aquí la licencia (MIT/Apache-2.0/etc.). Este repositorio no incluye una licencia explícita por ahora.
+Este repositorio no incluye una licencia explícita por ahora.
 
 ## Estado del proyecto
 

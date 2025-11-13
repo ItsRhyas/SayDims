@@ -612,7 +612,7 @@ void handleList(){
 void setup(){
   Serial.begin(115200);
   delay(500);
-  Serial.println("Simple server starting...");
+  Serial.println("Iniciando servidor simple...");
   // Initialize SPI with VSPI pins and SD card (CS=5, SCK=18, MISO=19, MOSI=23)
   SPI.begin(18, 19, 23, 5);
   if(tryInitSD()){
@@ -685,7 +685,7 @@ void setup(){
   server.onNotFound(handleNotFound);
 
   server.begin();
-  Serial.println("Server started (simple)");
+  Serial.println("Servidor iniciado (simple)");
 }
 
 void loop(){

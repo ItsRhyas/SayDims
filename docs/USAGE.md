@@ -27,6 +27,8 @@
 3. En el navegador visita `http://<esp32_ip>/` (ej. `http://192.168.1.200`).
 4. Si ves HTML sin CSS/JS, comprueba `/ls` y revisa la estructura en la SD.
 
+Nota sobre el modo offline: una vez sincronizados los datos e imágenes desde `index.html` (botón ⟳), la app puede seguir funcionando sin conexión leyendo del caché local (IndexedDB). Si el servidor está apagado, no podrás abrir páginas nuevas hasta volver a tener conexión.
+
 ### Sincronización y modo offline
 
 - En `index.html`, pulsa el botón izquierdo (⌂) para sincronizar datos e imágenes en el caché local (IndexedDB).

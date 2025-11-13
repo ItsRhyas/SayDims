@@ -8,8 +8,13 @@
   </head>
   <body data-page="index">
     <header>
-      <button class="UpperButton" title="Sincronizar" onclick="performSync()">
-        <span aria-hidden="true">⌂</span>
+      <button
+        class="UpperButton"
+        title="Sincronizar (modo offline)"
+        aria-label="Sincronizar datos e imágenes"
+        onclick="performSync()"
+      >
+        <span aria-hidden="true">⟳</span>
       </button>
       <h1>SayDims</h1>
       <button
@@ -31,6 +36,7 @@
       >
         <h3 style="margin: 0">Todos los Personajes</h3>
         <small id="lastSync" aria-live="polite" style="opacity: 0.8"></small>
+        <small style="opacity: 0.8">(Funciona offline tras sincronizar)</small>
       </div>
       <div id="characters"></div>
       <div id="spinnerOverlay" style="display: none" aria-hidden="true">
