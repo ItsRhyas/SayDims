@@ -150,4 +150,4 @@ Añade aquí la licencia (MIT/Apache-2.0/etc.). Este repositorio no incluye una 
 
 ## Estado del proyecto
 
-Branch principal de trabajo: `develop`.
+Branch principal de trabajo: `main`.

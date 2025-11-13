@@ -1,9 +1,9 @@
-// SayDim Frontend Main Script (clean rebuild)
-// Multi-page initialization, data loading, uploads, and UI helpers.
+// Script principal del frontend de SayDim (reconstrucción limpia)
+// Inicialización multipágina, carga de datos, subidas y utilidades de UI.
 
-// ---- Page Detection & Bootstrap ----
+// ---- Detección de página e inicio ----
 
-// Minimal global spinner helpers (work on any page with #spinnerOverlay)
+// Utilidades mínimas para un spinner global (funcionan en cualquier página con #spinnerOverlay)
 function showSpinnerOverlay(msg) {
   const ov = document.getElementById("spinnerOverlay");
   if (!ov) return;
@@ -16,7 +16,7 @@ function hideSpinnerOverlay() {
   if (ov) ov.style.display = "none";
 }
 
-// ---- IndexedDB (offline cache for JSON + images) ----
+// ---- IndexedDB (caché offline para JSON e imágenes) ----
 const IDB_NAME = "saydim-db";
 const IDB_VERSION = 1;
 function openIDB() {
@@ -73,7 +73,7 @@ async function idbGetAll(store) {
   });
 }
 
-// Store/retrieve image blobs by path
+// Guardar/recuperar blobs de imagen por ruta
 function normalizeAssetPath(p) {
   if (!p) return null;
   let s = String(p).trim();
@@ -103,7 +103,7 @@ async function getCachedImageURL(path) {
   return null;
 }
 
-// Decide the best image source; prefer cached blob when present
+// Decidir la mejor fuente de imagen; preferir el blob en caché cuando exista
 async function attachImage(imgEl, assetPath) {
   if (!imgEl || !assetPath) return;
   try {
@@ -133,7 +133,7 @@ async function attachImage(imgEl, assetPath) {
   }
 }
 
-// Perform a manual sync: fetch JSON and images, store to IDB
+// Realizar sincronización manual: obtener JSON e imágenes y guardarlos en IndexedDB
 async function performSync() {
   try {
     showSpinnerOverlay("Sincronizando...");
@@ -199,10 +199,10 @@ async function performSync() {
     hideSpinnerOverlay();
   }
 }
-// Expose for inline onclick in HTML
+// Exponer para uso inline via onclick en HTML
 window.performSync = performSync;
 function detectPage() {
-  // Prefer explicit data-page marker if present
+  // Preferir el marcador explícito data-page si está presente
   const bodyPage = document.body?.dataset?.page;
   if (bodyPage) return bodyPage;
   const p = location.pathname.toLowerCase();
@@ -218,7 +218,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (page === "index") {
     loadDims();
     loadRecentCharacters();
-    // Show last sync time if available
+    // Mostrar la hora de la última sincronización si existe
     (async () => {
       try {
         const ts = await idbGet("meta", "lastSync");
@@ -253,9 +253,9 @@ function updateLastSyncUI(ts) {
   }
 }
 
-// Populate dimension dropdown and wire upload forms on add page
+// Rellenar el selector de dimensiones y conectar formularios de subida en la página de agregar
 function setupAddPage() {
-  // Spinner helpers
+  // Utilidades de spinner
   function showSpinner(msg) {
     const ov = document.getElementById("spinnerOverlay");
     if (!ov) return;
@@ -278,7 +278,7 @@ function setupAddPage() {
     }
   }
   const dimSelect = document.getElementById("charDim");
-  // Powers modal elements
+  // Elementos del modal de poderes
   const editBtn = document.getElementById("editPowersBtn");
   const modal = document.getElementById("powersModal");
   const rowsContainer = document.getElementById("powersRows");
@@ -392,7 +392,7 @@ function setupAddPage() {
       closeModal();
     });
   }
-  // Initialize summary from any pre-existing JSON (unlikely now)
+  // Inicializar el resumen desde cualquier JSON preexistente (poco probable ahora)
   try {
     if (powersJson.value) {
       const arr = JSON.parse(powersJson.value);
@@ -418,7 +418,7 @@ function setupAddPage() {
         }
         dimSelect.innerHTML = "";
         dims.forEach((d) => {
-          if (!d.id) return; // skip malformed
+          if (!d.id) return; // omitir entradas malformadas
           const opt = document.createElement("option");
           opt.value = d.id;
           opt.textContent = d.nombre || d.name || d.id;
@@ -493,7 +493,7 @@ function setupAddPage() {
           alert("Error creando personaje: HTTP " + res.status);
           return;
         }
-        // Robust response parsing (JSON or text)
+        // Análisis robusto de la respuesta (JSON o texto)
         let data = null,
           textBody = null;
         try {
@@ -507,7 +507,7 @@ function setupAddPage() {
           }
         }
         hideSpinner();
-        // Accept 200 even if body couldn't be parsed; try to extract id from text
+        // Aceptar 200 incluso si el cuerpo no se pudo parsear; intentar extraer el id del texto
         const fallbackOk = res.ok && (!data || data.ok === undefined);
         if (!res.ok || (!fallbackOk && (!data || !data.ok))) {
           alert(
@@ -632,7 +632,7 @@ function setupAddPage() {
   }
 }
 
-// Dimension page with fallback
+// Página de dimensión con comportamiento de reserva (fallback)
 async function initDimensionPage() {
   try {
     const id = new URLSearchParams(location.search).get("id");
@@ -676,14 +676,14 @@ async function initDimensionPage() {
   }
 }
 
-// ---- Fetch & Utility Helpers ----
+// ---- Utilidades de red y apoyo ----
 async function fetchJSON(url) {
   try {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
     return await res.json();
   } catch (err) {
-    // Offline fallback via IndexedDB for API data
+    // Alternativa offline vía IndexedDB para datos de la API
     try {
       const u = new URL(url, location.origin);
       if (u.pathname === "/api/dimensions") {
@@ -712,7 +712,7 @@ function escapeHTML(str) {
     .replace(/'/g, "&#039;");
 }
 
-// ---- Dimensions (Index) ----
+// ---- Dimensiones (Inicio) ----
 async function loadDims() {
   try {
     updateDimensionsUI(await fetchJSON("/api/dimensions"));
@@ -744,7 +744,7 @@ function updateDimensionsUI(dims) {
     const img = document.createElement("img");
     img.className = "BannerImg";
     img.alt = p.textContent;
-    // Prefer cached image; if none, try network, else hide (no remote placeholder offline)
+    // Preferir imagen en caché; si no hay, intentar red; si falla, ocultar (sin placeholder remoto)
     attachImage(img, dim.image);
     link.appendChild(p);
     link.appendChild(img);
@@ -753,7 +753,7 @@ function updateDimensionsUI(dims) {
   });
 }
 
-// ---- Characters (Index & Dimension) ----
+// ---- Personajes (Inicio y Dimensión) ----
 async function loadRecentCharacters() {
   try {
     updateCharactersUI(await fetchJSON("/api/characters"));
@@ -772,7 +772,7 @@ async function loadCharacters(dimId) {
   }
 }
 
-// Render list of characters into #characters
+// Renderizar la lista de personajes en #characters
 function updateCharactersUI(chars) {
   const container = document.getElementById("characters");
   if (!container) return;
@@ -929,7 +929,7 @@ async function initCharacterPage() {
     // Attach image (prefer cached blob)
     const mainImg = document.getElementById("char-main-img");
     if (mainImg) attachImage(mainImg, char.foto);
-    // Attach images for other versions list
+    // Asignar imágenes para la lista de otras versiones
     const ovImgs = container.querySelectorAll(".CharList img[data-asset]");
     ovImgs.forEach((im) => {
       const ap = im.getAttribute("data-asset");
@@ -939,9 +939,9 @@ async function initCharacterPage() {
     console.error("Init character error", e);
   }
 }
-// (Removed duplicate escapeHTML + global exposures earlier)
+// (Se eliminó duplicado de escapeHTML y exposiciones globales anteriormente)
 
-// --- Image processing utilities (client-side optimization) ---
+// --- Utilidades de procesamiento de imágenes (optimización en cliente) ---
 function suggestJpegName(name) {
   const idx = name.lastIndexOf(".");
   return (idx > 0 ? name.slice(0, idx) : name) + ".jpg";
@@ -952,7 +952,7 @@ async function processImage(
   { ratio = 1, maxW = 800, maxH = 800, quality = 0.8, fill = "#ffffff" } = {}
 ) {
   const img = await blobToImage(file);
-  // Determine target size respecting ratio and bounds
+  // Determinar el tamaño objetivo respetando relación y límites
   let targetW = maxW;
   let targetH = Math.round(targetW / ratio);
   if (targetH > maxH) {
@@ -965,7 +965,7 @@ async function processImage(
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = fill;
   ctx.fillRect(0, 0, targetW, targetH);
-  // Cover scaling
+  // Escalado tipo "cover"
   const scale = Math.max(targetW / img.width, targetH / img.height);
   const dw = img.width * scale;
   const dh = img.height * scale;
@@ -993,7 +993,7 @@ function blobToImage(file) {
   });
 }
 
-// Convert canvas to Blob with broad browser support
+// Convertir canvas a Blob con amplia compatibilidad entre navegadores
 function canvasToBlob(canvas, type = "image/jpeg", quality = 0.85) {
   return new Promise((resolve, reject) => {
     try {
@@ -1007,7 +1007,7 @@ function canvasToBlob(canvas, type = "image/jpeg", quality = 0.85) {
           quality
         );
       } else {
-        // Fallback via dataURL
+        // Alternativa mediante dataURL
         const dataURL = canvas.toDataURL(type, quality);
         const parts = dataURL.split(",");
         const mimeMatch = parts[0].match(/:(.*?);/);

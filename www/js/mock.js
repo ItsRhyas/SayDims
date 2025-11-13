@@ -1,5 +1,5 @@
-// Simple mock layer for offline development.
-// Activate by opening index.html with ?mock=1 or setting window.SAYDIM_MOCK = true before this script.
+// Capa de simulación (mock) para desarrollo sin servidor.
+// Actívalo abriendo index.html con ?mock=1 o definiendo window.SAYDIM_MOCK = true antes de este script.
 (function () {
   const params = new URLSearchParams(window.location.search);
   const active = params.get("mock") === "1" || window.SAYDIM_MOCK === true;
@@ -9,7 +9,7 @@
   }
   console.log("%c[SayDim Mock] Activo - usando datos simulados", "color:#0a0");
 
-  // Fake datasets
+  // Datos simulados
   const mockDimensions = [
     {
       id: "d1",
@@ -65,7 +65,7 @@
     },
   ];
 
-  // Helper to build filtered/sorted characters like the real API
+  // Ayudante para filtrar/ordenar personajes como hace la API real
   function getCharactersFromQuery(url) {
     const u = new URL(url, window.location.origin);
     let list = mockCharacters.slice();
@@ -97,7 +97,7 @@
     return list;
   }
 
-  // Patch global fetch
+  // Interceptar fetch global
   const realFetch = window.fetch.bind(window);
   window.fetch = async function (url, options) {
     // Normalize URL to string
@@ -108,7 +108,7 @@
         ? url.url
         : String(url);
 
-    // Mocked endpoints
+    // Endpoints simulados
     if (urlStr.startsWith("/api/status")) {
       return mockResponse({ sdAvailable: true });
     }
@@ -119,7 +119,7 @@
       return mockResponse(getCharactersFromQuery(urlStr));
     }
     if (urlStr.startsWith("/upload/dimension")) {
-      // Simulate adding dimension
+      // Simular creación de dimensión
       const id = "d" + (mockDimensions.length + 1);
       mockDimensions.push({
         id,
@@ -146,12 +146,12 @@
       return mockResponse({ ok: true, id });
     }
 
-    // Assets: return 404 placeholder quickly (so onerror handlers kick in)
+    // Recursos: devolver 404 rápido (para que se active onerror de imágenes)
     if (urlStr.startsWith("/asset/")) {
       return mockResponse({ error: "asset mock 404" }, 404);
     }
 
-    // Fall through to real fetch for other resources
+    // Para otros recursos, continuar con fetch real
     return realFetch(url, options);
   };
 

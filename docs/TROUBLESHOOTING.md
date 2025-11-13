@@ -67,4 +67,4 @@ Adjunta:
 - Resultado de `http://<ip>/ls`.
 - Captura de la pestaña Network mostrando la petición que falla (Headers + Response).
 
-Con eso reviso punto a punto y preparo un parche si hace falta.
+Con esa información será posible diagnosticar el problema o preparar un parche. Si el repositorio está público, abre un issue e incluye estos datos.

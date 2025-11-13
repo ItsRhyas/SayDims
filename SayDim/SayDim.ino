@@ -23,13 +23,13 @@ const IPAddress primaryDNS(8,8,8,8);
 
 WebServer server(80);
 
-// SD availability flag
+// Indicador de disponibilidad de la tarjeta SD
 bool sdAvailable = false;
 
-static const char* sdHints = "Check wiring: GND->GND, CS->GPIO5, SCK->GPIO18, MOSI->GPIO23, MISO->GPIO19.\n"
-"Ensure module is powered at 3.3V (not 5V). Try lower SPI frequency if module/card is old.\n";
+static const char* sdHints = "Verifica el cableado: GND->GND, CS->GPIO5, SCK->GPIO18, MOSI->GPIO23, MISO->GPIO19.\n"
+"Alimenta el módulo a 3.3V (no a 5V). Prueba una frecuencia SPI más baja si el módulo/tarjeta es antigua.\n";
 
-// Try to initialize SD with multiple SPI frequencies and provide diagnostics
+// Intenta inicializar la SD y mostrar diagnósticos
 uint32_t sdWorkingFreq = 0;
 bool tryInitSD(){
   // Force a single, known-good SPI frequency (10 MHz) to reduce startup time.
@@ -44,22 +44,22 @@ bool tryInitSD(){
     Serial.printf("Working SPI freq: %lu\n", sdWorkingFreq);
     return true;
   }
-  Serial.println("SD.begin failed at 10 MHz, retrying with default parameters...");
+  Serial.println("SD.begin falló a 10 MHz, reintentando con parámetros por defecto...");
   if(SD.begin(5)){
     sdAvailable = true;
     sdWorkingFreq = 0;
-    Serial.println("SD initialized (default) successfully.");
+    Serial.println("SD inicializada (por defecto) correctamente.");
     uint8_t t = SD.cardType();
     Serial.printf("Card type: %u\n", t);
     return true;
   }
   sdAvailable = false;
-  Serial.println("SD init failed (10MHz + default).");
+  Serial.println("Fallo al iniciar SD (10MHz + por defecto).");
   Serial.println(sdHints);
   return false;
 }
 
-// Paths
+// Rutas
 const char* DATA_DIR = "/data";
 const char* DIM_DIR = "/dimensions";
 const char* CHAR_DIR = "/characters";
@@ -71,7 +71,7 @@ String getTimestampId(){
   return String((uint32_t)millis()) + String(esp_random() & 0xFFFF, HEX);
 }
 
-// File helpers using SD (SPI)
+// Funciones de ayuda para leer/escribir archivos en SD (SPI)
 String readFileToStringFS(const char* path){
   if(!sdAvailable) return String("[]");
   if(!SD.exists(path)) return String("[]");
@@ -96,7 +96,7 @@ bool writeStringToFileFS(const char* path, const String &data){
 
 void ensureFoldersFS(){
   if(!sdAvailable) {
-    Serial.println("ensureFoldersFS: SD not available, skipping folder creation.");
+    Serial.println("ensureFoldersFS: SD no disponible, se omite la creación de carpetas.");
     return;
   }
   // Create directories and default files on SD if missing
@@ -115,7 +115,7 @@ void ensureFoldersFS(){
   }
 }
 
-// Serve main page from SD card
+// Servir la página principal desde la SD
 void handleRoot() {
   if (!sdAvailable) {
     server.send(200, "text/plain", "Error: SD card not found. Please insert an SD card and restart the device.");
@@ -132,7 +132,7 @@ void handleRoot() {
   file.close();
 }
 
-// Utilities
+// Utilidades
 String mimeFromPath(const String &path){
   if(path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
   if(path.endsWith(".png")) return "image/png";
@@ -232,7 +232,7 @@ void apiCharacters(){
   server.send(200, "application/json", out);
 }
 
-// Serve static files from SD card
+// Servir archivos estáticos desde la SD
 void handleStaticFile() {
   if (!sdAvailable) {
     server.send(503, "text/plain", "SD card not available");
@@ -241,22 +241,22 @@ void handleStaticFile() {
   
   String req = server.uri();
 
-  // Debug: Print requested path
-  Serial.print("Requested path: ");
+  // Depuración: imprimir la ruta solicitada
+  Serial.print("Ruta solicitada: ");
   Serial.println(req);
 
-  // Security: Prevent directory traversal
+  // Seguridad: prevenir traversal de directorios
   if (req.indexOf("..") >= 0) {
-    server.send(403, "text/plain", "Forbidden");
+    server.send(403, "text/plain", "Prohibido");
     return;
   }
 
-  // Redirect helper for common extension-less routes
+  // Redirecciones útiles para rutas comunes sin extensión
   if (req == "/dimension") { server.sendHeader("Location", "/dimension.html"); server.send(302); return; }
   if (req == "/character") { server.sendHeader("Location", "/character.html"); server.send(302); return; }
   if (req == "/add") { server.sendHeader("Location", "/add.html"); server.send(302); return; }
 
-  // Normalize requested path into a candidate path (may or may not start with /www)
+  // Normalizar la ruta solicitada a una ruta candidata (puede o no comenzar con /www)
   String candidate;
   if (req.endsWith("/") || req == "/") {
     candidate = "/www/index.html";
@@ -271,29 +271,29 @@ void handleStaticFile() {
     candidate = req;
   }
 
-  // Build two checks: candidate, and the alternative with/without /www prefix
+  // Probar dos rutas: la candidata y la alternativa con/sin prefijo /www
   String alt;
   if (candidate.startsWith("/www/")) alt = candidate.substring(4); else alt = String("/www") + candidate;
 
-  // Choose the first existing path (candidate preferred, then alt)
+  // Elegir la primera ruta existente (preferir candidata, luego alternativa)
   String resolvedPath = candidate;
   if (!SD.exists(resolvedPath.c_str())) {
     if (SD.exists(alt.c_str())) resolvedPath = alt;
   }
 
-  // Check for gzipped version (respecting resolvedPath)
+  // Comprobar si existe versión .gz (respetando resolvedPath)
   String gzPath = resolvedPath + ".gz";
   bool gzipped = SD.exists(gzPath.c_str());
 
-  // Debug: Print final path we will use
-  Serial.print("Resolved path: ");
+  // Depuración: imprimir la ruta final que se usará
+  Serial.print("Ruta resuelta: ");
   Serial.println(gzipped ? gzPath : resolvedPath);
   
-  // Check if the file exists (use resolvedPath or its gzipped variant)
+  // Verificar si el archivo existe (usar resolvedPath o su variante comprimida)
   if (!SD.exists(gzipped ? gzPath.c_str() : resolvedPath.c_str())) {
-    Serial.print("File not found: ");
+    Serial.print("Archivo no encontrado: ");
     Serial.println(resolvedPath);
-    // CSS fallback: if requesting styles.css but only style.css exists
+    // Contingencia CSS: si se pide styles.css pero solo existe style.css
     if (resolvedPath.endsWith("/css/styles.css")) {
       String altCss = "/www/css/style.css"; // legacy name
       if (SD.exists(altCss.c_str())) {
@@ -306,7 +306,7 @@ void handleStaticFile() {
         }
       }
     }
-    // As a last resort, if it's an HTML request, serve index.html (SPA-style fallback)
+    // Como último recurso, si es un HTML, servir index.html (fallback tipo SPA)
     if (resolvedPath.endsWith(".html")) {
       String fallback = "/www/index.html";
       if (SD.exists(fallback.c_str())) {
@@ -318,11 +318,11 @@ void handleStaticFile() {
         }
       }
     }
-    server.send(404, "text/plain", "File not found: " + resolvedPath);
+    server.send(404, "text/plain", "Archivo no encontrado: " + resolvedPath);
     return;
   }
   
-  // Determine content type based on file extension
+  // Determinar el tipo de contenido según la extensión
   String contentType = "text/plain";
   if (resolvedPath.endsWith(".html") || resolvedPath.endsWith("/")) {
     contentType = "text/html";
@@ -338,53 +338,53 @@ void handleStaticFile() {
     contentType = "image/x-icon";
   }
 
-  // Debug: Print content type and path
-  Serial.print("Serving file: ");
+  // Depuración: imprimir tipo de contenido y ruta
+  Serial.print("Sirviendo archivo: ");
   Serial.print(resolvedPath);
   Serial.print(" as ");
   Serial.println(contentType);
 
-  // Open and stream the file (use resolvedPath or gzipped variant)
+  // Abrir y transmitir el archivo (usar resolvedPath o su variante .gz)
   File file = SD.open(gzipped ? gzPath.c_str() : resolvedPath.c_str(), FILE_READ);
   if (file) {
-    // Set content encoding if serving gzipped file
+    // Añadir cabecera de codificación si se sirve comprimido
     if (gzipped) {
       server.sendHeader("Content-Encoding", "gzip");
     }
     
-    // Set cache control for static files (1 day)
+    // Control de caché para archivos estáticos (1 día)
     server.sendHeader("Cache-Control", "public, max-age=86400");
     
-    // Stream the file with the appropriate content type
+    // Transmitir el archivo con el tipo de contenido adecuado
   server.streamFile(file, contentType.c_str());
     file.close();
     
-    // Debug: Print success message
+    // Depuración: imprimir mensaje de éxito
     Serial.println("File served successfully");
   } else {
-    Serial.println("Error opening file");
-    server.send(500, "text/plain", "Error opening file");
+    Serial.println("Error abriendo archivo");
+    server.send(500, "text/plain", "Error abriendo archivo");
   }
 }
 
-// Serve asset files from SD card
+// Servir archivos de recursos (/asset) desde la SD
 void handleAsset(){
   String uri = server.uri(); // e.g. /asset/dimensions/123.jpg
   if(!uri.startsWith("/asset/")) { server.send(404, "text/plain", "Not found"); return; }
   String real = uri.substring(6); // /dimensions/...
   if(real.indexOf("..")>=0){ server.send(403); return; }
-  if(!sdAvailable){ server.send(503, "text/plain", "SD not available"); return; }
+  if(!sdAvailable){ server.send(503, "text/plain", "SD no disponible"); return; }
   if(!SD.exists(real.c_str())){ server.send(404, "text/plain", "Not found"); return; }
   File f = SD.open(real.c_str(), FILE_READ);
   if(!f){ server.send(500, "text/plain", "File open error"); return; }
   String mime = mimeFromPath(real);
-  // Allow caching of static assets in the browser to reduce repeated transfers
+  // Permitir caché de recursos estáticos en el navegador para reducir transferencias
   server.sendHeader("Cache-Control", "public, max-age=86400");
   server.streamFile(f, mime.c_str());
   f.close();
 }
 
-// Upload handlers: dimension
+// Manejador de subida: dimensión
 void handleUploadDimension(){
   HTTPUpload &upload = server.upload();
   static File upFile;
@@ -393,27 +393,27 @@ void handleUploadDimension(){
   if(upload.status == UPLOAD_FILE_START){
     rejectUpload = false;
     if(!sdAvailable){
-      Serial.println("Upload rejected: SD not available");
+      Serial.println("Subida rechazada: SD no disponible");
       rejectUpload = true;
       return;
     }
     dimId = getTimestampId();
     path = String(DIM_DIR) + "/" + dimId + ".jpg";
-    // ensure dir
+    // asegurar directorio
     if(!SD.exists(DIM_DIR)) SD.mkdir(DIM_DIR);
     upFile = SD.open(path.c_str(), FILE_WRITE);
-    Serial.print("Uploading dimension image -> "); Serial.println(path);
+    Serial.print("Subiendo imagen de dimensión -> "); Serial.println(path);
   } else if(upload.status == UPLOAD_FILE_WRITE){
     if(rejectUpload) return;
     if(upFile) upFile.write(upload.buf, upload.currentSize);
   } else if(upload.status == UPLOAD_FILE_END){
-    if(rejectUpload) { server.send(503, "text/plain", "SD not available"); return; }
+    if(rejectUpload) { server.send(503, "text/plain", "SD no disponible"); return; }
     if(upFile) upFile.close();
-    // now collect form fields (server.args())
+    // ahora recolectar campos del formulario (server.args())
     String name = server.arg("name"); if(name.length()==0) name = "Sin nombre";
     String desc = server.arg("description");
     String history = server.arg("history");
-    // Load existing dimensions for duplicate name check BEFORE saving record
+    // Cargar dimensiones existentes para comprobar duplicados ANTES de guardar
     String existingRaw = readFileToStringFS(DIM_FILE);
     DynamicJsonDocument existingDoc(16384);
     deserializeJson(existingDoc, existingRaw);
@@ -421,7 +421,7 @@ void handleUploadDimension(){
     for(JsonObject d : existingArr){
       const char* existingName = d["nombre"] ? d["nombre"] : d["name"];
       if(existingName && String(existingName).equalsIgnoreCase(name)) {
-        // duplicate: remove uploaded image file and respond
+        // duplicado: eliminar la imagen subida y responder
         if(SD.exists(path.c_str())) SD.remove(path.c_str());
         server.send(409, "application/json", "{\"error\":\"La dimensión ya existe\"}");
         Serial.println("Dimension duplicate rejected: " + name);
@@ -453,7 +453,7 @@ void handleUploadDimension(){
   }
 }
 
-// Upload character handler
+// Manejador de subida: personaje
 void handleUploadCharacter(){
   HTTPUpload &upload = server.upload();
   static File upFile;
@@ -462,7 +462,7 @@ void handleUploadCharacter(){
   if(upload.status == UPLOAD_FILE_START){
     rejectUpload = false;
     if(!sdAvailable){
-      Serial.println("Upload rejected: SD not available");
+      Serial.println("Subida rechazada: SD no disponible");
       rejectUpload = true;
       return;
     }
@@ -470,12 +470,12 @@ void handleUploadCharacter(){
     path = String(CHAR_DIR) + "/" + charId + ".jpg";
     if(!SD.exists(CHAR_DIR)) SD.mkdir(CHAR_DIR);
     upFile = SD.open(path.c_str(), FILE_WRITE);
-    Serial.print("Uploading character image -> "); Serial.println(path);
+    Serial.print("Subiendo imagen de personaje -> "); Serial.println(path);
   } else if(upload.status == UPLOAD_FILE_WRITE){
     if(rejectUpload) return;
     if(upFile) upFile.write(upload.buf, upload.currentSize);
   } else if(upload.status == UPLOAD_FILE_END){
-    if(rejectUpload) { server.send(503, "text/plain", "SD not available"); return; }
+    if(rejectUpload) { server.send(503, "text/plain", "SD no disponible"); return; }
     if(upFile) upFile.close();
     String nombre = server.arg("nombre"); if(nombre.length()==0) nombre = "SinNombre";
     String dimension = server.arg("dimension");
@@ -484,7 +484,7 @@ void handleUploadCharacter(){
     String powers = server.arg("powers"); if(powers.length()==0) powers = "[]";
     String comentarios = server.arg("comentarios");
 
-    // ensure dimension exists
+    // asegurar que la dimensión exista
     String dimRaw = readFileToStringFS(DIM_FILE);
     DynamicJsonDocument dimsDoc(16384);
     deserializeJson(dimsDoc, dimRaw);
@@ -493,12 +493,12 @@ void handleUploadCharacter(){
       if(String((const char*)d["id"].as<const char*>())==dimension){ dimExists=true; break; }
     }
     if(!dimExists){ Serial.println("Dimension no existe: " + dimension); server.send(400, "application/json", "{\"error\":\"La dimensión no existe\"}"); return; }
-    // Load existing characters for duplicate & multiverse logic
+    // Cargar personajes existentes para lógica de duplicados y multiverso
     String raw = readFileToStringFS(CHAR_FILE);
     DynamicJsonDocument charsDoc(32768);
     deserializeJson(charsDoc, raw);
     JsonArray carr = charsDoc.as<JsonArray>();
-    // Duplicate check (same name + same dimension)
+    // Comprobación de duplicado (mismo nombre + misma dimensión)
     for(JsonObject c : carr){
       const char* en = c["nombre"]; const char* ed = c["dimension"];
       if(en && ed && String(en).equalsIgnoreCase(nombre) && String(ed) == dimension){
@@ -508,7 +508,7 @@ void handleUploadCharacter(){
         return;
       }
     }
-    // Determine multiverseId (same name across other dimensions)
+    // Determinar multiverseId (mismo nombre en otras dimensiones)
     String multiverseId="";
     for(JsonObject c : carr){
       const char* en = c["nombre"]; const char* ed = c["dimension"]; 
@@ -558,17 +558,17 @@ void handleUploadCharacter(){
 
 void handleNotFound(){
   String uri = server.uri();
-  // Log not-found requests for debugging
+  // Registrar peticiones no encontradas para depuración
   Serial.print("NotFound request: ");
   Serial.println(uri);
   Serial.print("Method: "); Serial.println(server.method());
-  // Print a few headers for context
+  // Imprimir algunas cabeceras para contexto
   Serial.print("Host: "); Serial.println(server.hostHeader());
   Serial.print("User-Agent: "); Serial.println(server.header("User-Agent"));
 
-  // Try to handle static files here as a fallback
+  // Intentar manejar archivos estáticos como último recurso
   if(uri.startsWith("/asset/")) { handleAsset(); return; }
-  // Delegate ANY typical static resource (including .html) to handleStaticFile
+  // Delegar cualquier recurso estático típico (incluye .html) a handleStaticFile
   if (uri.startsWith("/css/") || uri.startsWith("/js/") || uri.startsWith("/img/") || uri.endsWith(".css") || uri.endsWith(".js") || uri.endsWith(".html") || uri == "/favicon.ico") {
     Serial.println("NotFound -> delegating to handleStaticFile (static extension)");
     handleStaticFile();
@@ -578,9 +578,9 @@ void handleNotFound(){
   server.send(404, "text/plain", "No encontrado");
 }
 
-// Diagnostic: list SD contents for troubleshooting
+// Diagnóstico: listar contenidos de la SD para solución de problemas
 void handleList(){
-  if(!sdAvailable){ server.send(503, "text/plain", "SD not available"); return; }
+  if(!sdAvailable){ server.send(503, "text/plain", "SD no disponible"); return; }
   String out = "SD contents check:\n";
   // Check common paths
   const char* checks[] = {"/www/index.html","/www/css/style.css","/www/js/app.js","/css/style.css","/js/app.js","/img/placeholder.jpg","/www/img/placeholder.jpg","/data/dimensions.json","/dimensions","/characters"};
@@ -629,7 +629,7 @@ void setup(){
   while(WiFi.status()!=WL_CONNECTED && tries<40){ Serial.print('.'); delay(500); tries++; }
   if(WiFi.status()!=WL_CONNECTED) Serial.println("\nWiFi failed"); else Serial.println("\nConnected: " + WiFi.localIP().toString());
 
-  // NTP time sync for accurate timestamps
+  // Sincronización NTP para marcas de tiempo precisas
   if(WiFi.status()==WL_CONNECTED){
     Serial.println("Configuring NTP time...");
     configTime(0, 0, "pool.ntp.org", "time.nist.gov"); // UTC; client renders local time
@@ -646,8 +646,8 @@ void setup(){
     }
   }
 
-  // Routes
-  // API endpoints FIRST (so they are not captured by wildcard static handler)
+  // Rutas
+  // Endpoints de API primero (para que no los capture el manejador genérico)
   server.on("/api/status", HTTP_GET, []() {
     DynamicJsonDocument doc(128);
     doc["sdAvailable"] = sdAvailable;
@@ -655,30 +655,30 @@ void setup(){
     serializeJson(doc, json);
     server.send(200, "application/json", json);
   });
-  // API endpoints for data
+  // Endpoints de API para datos
   server.on("/api/dimensions", HTTP_GET, apiDimensions);
   server.on("/api/characters", HTTP_GET, apiCharacters);
   
-  // Serve static files
+  // Servir archivos estáticos
   server.on("/", HTTP_GET, handleRoot);
-  // Explicit top-level pages (ensure these paths are handled)
+  // Páginas principales explícitas (asegurar que estas rutas se manejen)
   server.on("/index.html", HTTP_GET, handleStaticFile);
   server.on("/dimension.html", HTTP_GET, handleStaticFile);
   server.on("/character.html", HTTP_GET, handleStaticFile);
   server.on("/add.html", HTTP_GET, handleStaticFile);
-  // Explicit common static paths (improve logging and ensure matching)
+  // Rutas estáticas comunes explícitas (mejorar logging y asegurar coincidencia)
   server.on("/css/*", HTTP_GET, [](){ Serial.println("Incoming request (css)"); handleStaticFile(); });
   server.on("/js/*", HTTP_GET, [](){ Serial.println("Incoming request (js)"); handleStaticFile(); });
   server.on("/img/*", HTTP_GET, [](){ Serial.println("Incoming request (img)"); handleStaticFile(); });
-  // Diagnostic listing
+  // Listado de diagnóstico
   server.on("/ls", HTTP_GET, handleList);
-  // Catch-all static AFTER APIs
+  // Captura estáticos genéricos DESPUÉS de las APIs
   server.on("/*", HTTP_GET, handleStaticFile);
   
-  // Asset handling is now done in handleStaticFile
+  // El manejo de /asset ahora lo hace handleStaticFile
 
-  // Upload endpoints: note WebServer calls the handler and upload callback separately
-  // Upload endpoints: response handled inside upload callbacks (avoid double send)
+  // Endpoints de subida: WebServer llama al handler y al callback de subida por separado
+  // Respuesta gestionada dentro de los callbacks de subida (evitar doble envío)
   server.on("/upload/dimension", HTTP_POST, [](){ if(!sdAvailable) server.send(503, "application/json", "{\"error\":\"SD no disponible\"}"); }, handleUploadDimension);
   server.on("/upload/character", HTTP_POST, [](){ if(!sdAvailable) server.send(503, "application/json", "{\"error\":\"SD no disponible\"}"); }, handleUploadCharacter);
 
