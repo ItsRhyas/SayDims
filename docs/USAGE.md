@@ -27,11 +27,19 @@
 3. En el navegador visita `http://<esp32_ip>/` (ej. `http://192.168.1.200`).
 4. Si ves HTML sin CSS/JS, comprueba `/ls` y revisa la estructura en la SD.
 
+### Sincronización y modo offline
+
+- En `index.html`, pulsa el botón izquierdo (⌂) para sincronizar datos e imágenes en el caché local (IndexedDB).
+- Verás un indicador "Última sync" junto al título cuando haya finalizado.
+- Una vez sincronizado, si el ESP32 se cae, la app seguirá mostrando dimensiones y personajes desde el caché. Las imágenes aparecerán solo si existían en la SD y se cachearon durante la sync.
+- Importante: sin Service Worker, abrir páginas nuevas (p. ej. `character.html?id=...`) requiere que el HTML se sirva en ese momento. Si el servidor está offline, no podrás abrir nuevas páginas, pero las ya abiertas podrán refrescar datos desde caché.
+
 ## Subir imágenes desde la web
 
 - Usa los formularios en la UI (para dimensiones y personajes). Las peticiones `POST /upload/*` guardan imágenes y actualizan los JSON en `/data`.
 - En Agregar personaje, usa el botón "Editar poderes" para abrir un popup que permite añadir/eliminar poderes y traducirlos a JSON automáticamente (sin escribirlo a mano). Al guardar, verás un contador de poderes.
 - Durante el envío se muestra un spinner de progreso; las imágenes se recomprimen automáticamente (16:9 para dimensiones, 1:1 para personajes) antes de subir.
+- En el popup de poderes, los campos "Daño" y "Usos/CoolDown" se tratan como texto (no estrictamente números) para admitir formatos personalizados.
 
 ## Pruebas locales
 
@@ -61,6 +69,13 @@ Qué hace el modo mock:
 - El constructor de poderes también funciona en modo mock; los datos se insertan en el objeto ficticio que devuelve la API.
 
 Para desactivar el mock, elimina `?mock=1` de la URL.
+
+## Limpieza de caché (opcional)
+
+Si deseas limpiar el caché local (IndexedDB) en el navegador:
+
+- Abre las herramientas de desarrollador → Application/Almacenamiento → IndexedDB → elimina la base `saydim-db`.
+- O borra el almacenamiento del sitio desde la configuración del navegador y vuelve a sincronizar desde `index.html`.
 
 ## Copias de seguridad
 

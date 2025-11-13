@@ -37,7 +37,7 @@ Todas las rutas usan HTTP simples (sin autenticación) y devuelven JSON o archiv
     - `dir` — `asc` o `desc` (default `asc`)
   - Respuesta: Array de objetos Character. El servidor puede enriquecer con `dimensionName`.
   - Campos relevantes:
-    - `id`, `nombre`, `dimension` (id), `dimensionName` (opcional), `vida`, `foto`, `descripcion`, `powers` (array), `comentarios`, `created` (epoch seg), `multiverseId` (opcional)
+    - `id`, `nombre`, `dimension` (id), `dimensionName` (opcional), `vida`, `foto` (ruta como `/characters/<id>.jpg`), `descripcion`, `powers` (array), `comentarios`, `created` (epoch seg, sincronizado vía NTP en firmware), `multiverseId` (opcional)
   - Ejemplo:
     ```json
     [
@@ -92,7 +92,12 @@ Todas las rutas usan HTTP simples (sin autenticación) y devuelven JSON o archiv
     - `503` si SD no disponible.
 
 - `GET /asset/<path>`
+
   - Sirve archivos ubicados en la SD fuera de `/www`, por ejemplo `GET /asset/dimensions/abc.jpg` devolverá `/dimensions/abc.jpg`.
+
+  - Notas de cliente (offline):
+    - El cliente normaliza `image`/`foto` a una clave de caché (`/dimensions/...`, `/characters/...`).
+    - Si existe un blob cacheado en IndexedDB, se usa en preferencia a la red; si no hay blob y no hay conexión, la imagen no se muestra (no placeholder).
 
 ## MIME y cabeceras
 
@@ -104,6 +109,7 @@ Todas las rutas usan HTTP simples (sin autenticación) y devuelven JSON o archiv
 ## Errores comunes
 
 - `404 Not Found` — archivo no presente en la SD o ruta mal formada.
+  - Común al acceder a `/asset/...` si la imagen nunca fue subida o el JSON referencia un path inexistente. Verifica con `/ls`.
 - `503` — SD no detectada.
 - `500` — error interno al abrir el archivo.
 

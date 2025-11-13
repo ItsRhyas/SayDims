@@ -8,8 +8,8 @@
   </head>
   <body data-page="index">
     <header>
-      <button class="UpperButton" title="Menú">
-        <span aria-hidden="true">≡</span>
+      <button class="UpperButton" title="Sincronizar" onclick="performSync()">
+        <span aria-hidden="true">⌂</span>
       </button>
       <h1>SayDims</h1>
       <button
@@ -26,7 +26,12 @@
     </nav>
 
     <main>
-      <h3>Todos los Personajes</h3>
+      <div
+        style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"
+      >
+        <h3 style="margin: 0">Todos los Personajes</h3>
+        <small id="lastSync" aria-live="polite" style="opacity: 0.8"></small>
+      </div>
       <div id="characters"></div>
       <div id="spinnerOverlay" style="display: none" aria-hidden="true">
         <div class="spinner"></div>

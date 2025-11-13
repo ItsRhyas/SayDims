@@ -10,10 +10,10 @@ SayDim está diseñado como una aplicación cliente/servidor ligera donde:
 ## Diagramas
 
 Diagrama de clases
-![alt text](image.png)
+![alt text](CasosDeUso.png)
 
 Diagrama de casos de uso
-![alt text](image-1.png)
+![alt text](CasosDeUso.png)
 
 ## Componentes
 
@@ -32,6 +32,13 @@ Diagrama de casos de uso
    - Páginas: `index.html`, `dimension.html`, `character.html`, `add.html`.
    - Estilos y scripts: `www/css/styles.css`, `www/js/app.js`, `www/js/mock.js`.
    - Flujo: el JS consume `GET /api/dimensions` y `GET /api/characters` y usa `/upload/*` para enviar formularios con archivos. En `add.html`, un popup construye el JSON de poderes.
+   - Offline-first (cliente):
+     - IndexedDB con stores: `dimensions`, `characters`, `images` (Blob), `meta` (p.ej. `lastSync`).
+     - `performSync()` descarga JSON e imágenes desde `/api/*` y `/asset/*` y los guarda en caché.
+     - `fetchJSON()` intenta red; si falla, cae a los stores de IndexedDB (incluye filtro por `dim`).
+     - `attachImage()` muestra primero el blob cacheado; si no existe y hay conexión, usa `/asset/<path>`; si no, oculta la imagen (sin placeholders remotos).
+     - `normalizeAssetPath()` garantiza claves coherentes en caché (p.ej. `/dimensions/a.jpg` y `dimensions/a.jpg`).
+     - Sin Service Worker: los HTML deben poder servirse en el momento del acceso; los datos/imagenes sí pueden venir del caché.
 
 3. Tarjeta SD
    - Debe contener al menos:
@@ -51,9 +58,11 @@ Diagrama de casos de uso
 - Se soporta `/asset/` para diferenciar recursos que vienen del almacenamiento (imágenes subidas) de los fijos en `/www`.
 - En el cliente, las imágenes se recomprimen (JPEG) y se recortan a la relación de aspecto esperada antes de subir para reducir tamaño.
 - El código prioriza simplicidad y trazabilidad (varias salidas Serial para debugging).
+- Soporte offline sin SW: elección de IndexedDB por estar disponible en HTTP; se evita sobrecargar el ESP32 con sincronizaciones automáticas agresivas.
 
 ## Limitaciones
 
 - No hay autenticación ni HTTPS (por simplicidad y limitaciones del ESP32/SD).
 - Performance en SD puede variar según la tarjeta y frecuencia SPI.
 - Manejo de concurrencia simple: WebServer síncrono; cargas grandes pueden bloquear si la SD es lenta.
+- Sin Service Worker: no se pueden abrir páginas nuevas estando completamente offline; necesitas que el servidor sirva el HTML al menos una vez.

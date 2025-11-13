@@ -30,12 +30,16 @@ Root of SD (ejemplo)
 - Si copias desde el repo, copia exactamente la carpeta `www` a la raíz de la SD.
 - `data/*.json` deben existir (el firmware intentará crearlos si faltan). Si ya existen, deben contener un array JSON válido (por ejemplo `[]`).
 - Las imágenes subidas se guardan en `/dimensions` y `/characters` y se referencian desde los objetos JSON como `/dimensions/<id>.jpg`.
+- Las imágenes subidas se guardan en `/dimensions` y `/characters` y se referencian desde los objetos JSON como `/dimensions/<id>.jpg` o `/characters/<id>.jpg`.
+- El cliente solicita imágenes con prefijo `/asset`: por ejemplo `image: "/dimensions/abc.jpg"` se carga desde `GET /asset/dimensions/abc.jpg`.
+- Para el modo offline, esas rutas deben existir realmente en la SD y haberse sincronizado al menos una vez para que se muestren sin conexión.
 
 ## Recomendaciones
 
 - Formatea la SD en FAT32 para mayor compatibilidad.
 - Usa una tarjeta de buena calidad y evita velocidades excesivas; el firmware prueba iniciar a 10MHz y luego a la frecuencia por defecto.
 - Si el navegador muestra 404, usa el endpoint `/ls` en el ESP (`http://<ip>/ls`) para listar la existencia de rutas comunes.
+- Un 404 en `/asset/...` indica que falta el archivo en la SD; súbelo o corrige el JSON y vuelve a sincronizar.
 
 ## Cómo copiar
 
