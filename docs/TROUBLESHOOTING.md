@@ -28,7 +28,10 @@
 
 5. Imágenes no cargan
 
-- La UI usa un fallback a imágenes remotas (picsum.photos) si falla cargar desde la SD. Si no ves imágenes, confirma que tienes conexión a internet en el equipo donde ves la UI o que las rutas en los JSON apuntan a `/dimensions/...` y `/characters/...` válidos.
+- En modo actual, no se usa placeholder remoto cuando estás offline. Si la imagen no está en caché y no hay conexión, se ocultará.
+- Si ves `404 Not Found` para `/asset/...` en el Serial, significa que el archivo no existe en la SD o la ruta en el JSON es incorrecta.
+  - Verifica con `http://<ip>/ls` y corrige la ruta/archivo.
+  - Ejecuta la sincronización desde `index.html` (botón ⌂) para cachear la imagen.
 
 6. No se guardan las vistas/archivos JSON
 7. No funcionan páginas distintas a index (404 en /dimension.html o /character.html)
@@ -44,11 +47,17 @@
 
 - Verifica que el ESP puede escribir en SD: revisa que `writeStringToFileFS` devuelve true y que las entradas en `/data/*.json` cambian después de subir.
 
+9. Offline: datos aparecen pero imágenes no
+
+- Causa: las imágenes no se habían sincronizado previamente, o el path en JSON no existe en la SD.
+- Solución: estando online, pulsa sincronizar (⌂) en `index.html` y vuelve a probar. Asegúrate de que `image`/`foto` del JSON apunten a `/dimensions/...` o `/characters/...` existentes.
+
 ## Diagnósticos útiles
 
 - `http://<esp_ip>/ls` — muestra existencia de ficheros importantes.
 - Monitor Serial (115200) — traza de requests, errores y estados SD.
 - DevTools Network — cabeceras y respuestas HTTP (404, 500, etc.).
+- DevTools Application/Storage — ver y limpiar IndexedDB `saydim-db`.
 
 ## Si necesitas ayuda
 
