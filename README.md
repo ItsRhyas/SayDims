@@ -2,6 +2,12 @@
 
 Aplicación web ligera para ESP32 que gestiona Dimensiones y Personajes desde una tarjeta microSD. La interfaz es multipágina (inicio, dimensión, personaje y agregar), los datos e imágenes viven en la SD y el ESP32 expone un API HTTP simple para consultar y crear contenido.
 
+## Planteamiento
+
+Hasta el momento, había trabajado únicamente en repositorios privados para proyectos universitarios. Me propuse iniciar un proyecto personal que pudiera publicar y decidí desarrollarlo pensando en mi hermano menor. Se trata de una plataforma en la que él pueda acceder a la información de los personajes que posee como minifiguras, así como a las características que les atribuye al jugar. Anteriormente, él utilizaba un chat de WhatsApp para registrar estos datos, pero con esta plataforma podrá acceder a ellos de manera más cómoda y estructurada. A continuacion un ejemplo cos dos personajes de dos dimensiones distintas:
+
+![alt text](vistas.png)
+
 ## Características
 
 - UI multipágina servida desde la SD: `index.html`, `dimension.html`, `character.html`, `add.html`.
