@@ -1,6 +1,6 @@
 /*
   SayDim.ino
-  Servidor web simple para gestionar dimensiones y personajes.
+  Servidor web simple para gestionar personajes y dimensiones.
   - Usa WebServer (ESP32 core) y la tarjeta microSD para almacenar imágenes y datos JSON.
   - Minimiza librerías: WiFi, WebServer, ArduinoJson, SPI y SD.
   - Subidas manejadas con WebServer.upload().
@@ -658,6 +658,85 @@ void setup(){
   // Endpoints de API para datos
   server.on("/api/dimensions", HTTP_GET, apiDimensions);
   server.on("/api/characters", HTTP_GET, apiCharacters);
+  // Crear personaje usando imagen existente (sin subir archivo nuevo)
+  server.on("/api/createCharacterExisting", HTTP_POST, [](){
+    if(!sdAvailable){ server.send(503, "application/json", "{\"error\":\"SD no disponible\"}"); return; }
+    String body = server.arg("plain");
+    if(body.length()==0){ server.send(400, "application/json", "{\"error\":\"Cuerpo vacío\"}"); return; }
+    DynamicJsonDocument doc(16384);
+    DeserializationError derr = deserializeJson(doc, body);
+    if(derr){ server.send(400, "application/json", "{\"error\":\"JSON inválido\"}"); return; }
+    const char* nombreC = doc["nombre"] | "";
+    const char* dimensionC = doc["dimension"] | "";
+    int vidaC = doc["vida"] | 0;
+    const char* descripcionC = doc["descripcion"] | "";
+    const char* comentariosC = doc["comentarios"] | "";
+    const char* fotoC = doc["foto"] | ""; // ruta existente
+    if(String(dimensionC).length()==0){ server.send(400, "application/json", "{\"error\":\"Dimensión requerida\"}"); return; }
+    if(String(fotoC).length()==0){ server.send(400, "application/json", "{\"error\":\"Foto requerida\"}"); return; }
+    // Verificar que la ruta de la imagen exista realmente
+    if(!SD.exists(String(fotoC).c_str())){ server.send(400, "application/json", "{\"error\":\"Imagen no existe\"}"); return; }
+    // Verificar que la dimensión exista
+    String dimRaw = readFileToStringFS(DIM_FILE);
+    DynamicJsonDocument dimsDoc(16384);
+    deserializeJson(dimsDoc, dimRaw);
+    bool dimExists=false;
+    for(JsonObject d : dimsDoc.as<JsonArray>()){
+      const char* idd = d["id"]; if(idd && String(idd)==String(dimensionC)){ dimExists=true; break; }
+    }
+    if(!dimExists){ server.send(400, "application/json", "{\"error\":\"La dimensión no existe\"}"); return; }
+    // Cargar personajes existentes
+    String rawChars = readFileToStringFS(CHAR_FILE);
+    DynamicJsonDocument charsDoc(32768);
+    deserializeJson(charsDoc, rawChars);
+    JsonArray carr = charsDoc.as<JsonArray>();
+    // Duplicado: mismo nombre + misma dimensión
+    for(JsonObject c : carr){
+      const char* en = c["nombre"]; const char* ed = c["dimension"]; if(en && ed && String(en).equalsIgnoreCase(nombreC) && String(ed)==String(dimensionC)){
+        server.send(409, "application/json", "{\"error\":\"Este personaje ya existe en esta dimensión\"}"); return;
+      }
+    }
+    // MultiverseId (igual nombre en otras dimensiones)
+    String multiverseId="";
+    for(JsonObject c : carr){
+      const char* en = c["nombre"]; const char* ed = c["dimension"]; if(en && ed && String(en).equalsIgnoreCase(nombreC) && String(ed)!=String(dimensionC)){
+        if(c.containsKey("multiverseId")) multiverseId = String((const char*)c["multiverseId"].as<const char*>());
+        break;
+      }
+    }
+    if(multiverseId.length()==0){
+      bool otherExists=false;
+      for(JsonObject c : carr){ const char* en = c["nombre"]; const char* ed = c["dimension"]; if(en && ed && String(en).equalsIgnoreCase(nombreC) && String(ed)!=String(dimensionC)){ otherExists=true; break; } }
+      if(otherExists) multiverseId = String("mv-") + getTimestampId();
+    }
+    if(multiverseId.length()>0){
+      for(JsonObject c : carr){ const char* en = c["nombre"]; const char* ed = c["dimension"]; if(en && ed && String(en).equalsIgnoreCase(nombreC) && String(ed)!=String(dimensionC) && !c.containsKey("multiverseId")){ c["multiverseId"] = multiverseId; } }
+    }
+    // Crear nuevo objeto
+    String charId = getTimestampId() + String(esp_random() & 0xFFFF, HEX);
+    DynamicJsonDocument newDoc(8192);
+    JsonObject obj = newDoc.to<JsonObject>();
+    obj["id"] = charId;
+    obj["nombre"] = String(nombreC).length()? nombreC : "SinNombre";
+    obj["dimension"] = dimensionC;
+    obj["vida"] = vidaC;
+    obj["descripcion"] = descripcionC;
+    obj["foto"] = fotoC; // reutiliza imagen existente
+    obj["comentarios"] = comentariosC;
+    obj["created"] = String((uint32_t)time(nullptr));
+    if(multiverseId.length()>0) obj["multiverseId"] = multiverseId;
+    // Poderes
+    if(doc.containsKey("powers") && doc["powers"].is<JsonArray>()){
+      obj["powers"] = doc["powers"].as<JsonArray>();
+    } else {
+      obj.createNestedArray("powers");
+    }
+    carr.add(obj);
+    String outChars; serializeJson(charsDoc, outChars);
+    if(!writeStringToFileFS(CHAR_FILE, outChars)){ server.send(500, "application/json", "{\"error\":\"No se pudo escribir archivo\"}"); return; }
+    String resp = String("{\"ok\":true,\"id\":\"") + charId + "\"" + (multiverseId.length()>0? (",\"multiverseId\":\""+multiverseId+"\"") : "") + "}";
+    server.send(200, "application/json", resp);
+  });
   // Guardar archivo completo de personajes (reemplaza characters.json)
   server.on("/api/saveCharacters", HTTP_POST, [](){
     if(!sdAvailable){ server.send(503, "application/json", "{\"error\":\"SD no disponible\"}"); return; }

@@ -584,6 +584,83 @@ function setupAddPage() {
   }
   const charForm = document.getElementById("charForm");
   if (charForm) {
+    // --- Selección de imagen existente vs nueva ---
+    const imageSourceRadios = charForm.querySelectorAll(
+      'input[name="imageSource"]'
+    );
+    const newImageDiv = document.getElementById("newImageInputs");
+    const existingImageDiv = document.getElementById("existingImageInputs");
+    const existingImageSelect = document.getElementById("existingImageSelect");
+    const existingImagePreview = document.getElementById(
+      "existingImagePreview"
+    );
+    let existingImages = []; // [{path, label}]
+
+    function refreshImageSourceUI() {
+      const sel = charForm.querySelector('input[name="imageSource"]:checked');
+      const mode = sel ? sel.value : "new";
+      if (mode === "existing") {
+        if (newImageDiv) newImageDiv.style.display = "none";
+        if (existingImageDiv) existingImageDiv.style.display = "block";
+      } else {
+        if (newImageDiv) newImageDiv.style.display = "block";
+        if (existingImageDiv) existingImageDiv.style.display = "none";
+      }
+    }
+    imageSourceRadios.forEach((r) =>
+      r.addEventListener("change", refreshImageSourceUI)
+    );
+    refreshImageSourceUI();
+
+    async function loadExistingImages() {
+      try {
+        const chars = await fetchJSON("/api/characters");
+        if (!Array.isArray(chars)) return;
+        const seen = new Set();
+        existingImages = [];
+        chars.forEach((c) => {
+          if (c.foto && !seen.has(c.foto)) {
+            seen.add(c.foto);
+            const label =
+              (c.nombre || "(Sin nombre)") +
+              (c.dimensionName ? " · " + c.dimensionName : "");
+            existingImages.push({ path: c.foto, label });
+          }
+        });
+        if (existingImageSelect) {
+          existingImageSelect.innerHTML =
+            '<option value="">(Selecciona)</option>';
+          existingImages.forEach((img) => {
+            const opt = document.createElement("option");
+            opt.value = img.path;
+            opt.textContent = img.label;
+            existingImageSelect.appendChild(opt);
+          });
+        }
+      } catch (e) {
+        if (existingImageSelect) {
+          existingImageSelect.innerHTML = '<option value="">(Error)</option>';
+        }
+      }
+    }
+    // Cargar lista al entrar a la página
+    loadExistingImages();
+
+    if (existingImageSelect) {
+      existingImageSelect.addEventListener("change", () => {
+        const val = existingImageSelect.value;
+        if (!val) {
+          if (existingImagePreview) existingImagePreview.style.display = "none";
+          return;
+        }
+        if (existingImagePreview) {
+          existingImagePreview.style.display = "block";
+          // Usar attachImage para preferir caché
+          attachImage(existingImagePreview, val);
+        }
+      });
+    }
+
     charForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       try {
@@ -609,6 +686,91 @@ function setupAddPage() {
         if (!Array.isArray(powersArr) || powersArr.length === 0) {
           powersArr = parsePowers(charForm.powers.value);
         }
+        const imageModeRadio = charForm.querySelector(
+          'input[name="imageSource"]:checked'
+        );
+        const imageMode = imageModeRadio ? imageModeRadio.value : "new";
+        if (imageMode === "existing") {
+          const selectedPath = existingImageSelect
+            ? existingImageSelect.value.trim()
+            : "";
+          if (!selectedPath) {
+            alert("Selecciona una imagen existente");
+            return;
+          }
+          // Enviar JSON directo al nuevo endpoint
+          showSpinner("Creando personaje...");
+          const payload = {
+            nombre: nombre || "SinNombre",
+            dimension,
+            vida: charForm.vida.value ? Number(charForm.vida.value) : 0,
+            descripcion: charForm.descripcion.value.trim(),
+            comentarios: charForm.comentarios.value.trim(),
+            powers: powersArr,
+            foto: selectedPath,
+          };
+          const res = await fetch("/api/createCharacterExisting", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            hideSpinner();
+            if (res.status === 409) {
+              alert("Este personaje ya existe en esta dimensión");
+              return;
+            }
+            if (res.status === 400) {
+              const txt = await res.text();
+              alert("Error: " + txt);
+              return;
+            }
+            if (res.status === 503) {
+              alert("La tarjeta SD no está disponible");
+              return;
+            }
+            alert("Error creando personaje: HTTP " + res.status);
+            return;
+          }
+          let data = null,
+            textBody = null;
+          try {
+            data = await res.clone().json();
+          } catch {
+            try {
+              textBody = await res.text();
+              data = JSON.parse(textBody);
+            } catch {}
+          }
+          hideSpinner();
+          const fallbackOk = res.ok && (!data || data.ok === undefined);
+          if (!res.ok || (!fallbackOk && (!data || !data.ok))) {
+            alert(
+              "Error creando personaje: " +
+                (data && data.error ? data.error : "HTTP " + res.status)
+            );
+            return;
+          }
+          const newId =
+            data && data.id
+              ? data.id
+              : (() => {
+                  try {
+                    const m = (textBody || "").match(/"id"\s*:\s*"([^"]+)"/);
+                    return m ? m[1] : null;
+                  } catch {
+                    return null;
+                  }
+                })();
+          alert("Personaje creado ✔" + (newId ? " ID: " + newId : ""));
+          if (newId) {
+            location.href = "character.html?id=" + encodeURIComponent(newId);
+          } else {
+            location.href = "index.html";
+          }
+          return; // termina flujo existing
+        }
+        // Flujo original: subir nueva imagen
         fd.append("powers", JSON.stringify(powersArr));
         const fotoInput = charForm.foto;
         if (!fotoInput.files[0]) {

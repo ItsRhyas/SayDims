@@ -36,11 +36,48 @@
           </label>
           <input type="number" name="vida" placeholder="Vida" />
           <textarea name="descripcion" placeholder="Descripción"></textarea>
-          <input type="file" name="foto" accept="image/*" required />
-          <small
-            >La imagen se recortará a 1:1 y se comprimirá
-            automáticamente.</small
+          <fieldset
+            id="imageSourceGroup"
+            style="border: 1px solid #333; padding: 0.5rem; border-radius: 6px"
           >
+            <legend style="font-size: 0.9rem">Imagen</legend>
+            <label style="display: inline-block; margin-right: 1rem">
+              <input type="radio" name="imageSource" value="new" checked />
+              Subir nueva
+            </label>
+            <label style="display: inline-block; margin-right: 1rem">
+              <input type="radio" name="imageSource" value="existing" /> Usar
+              existente
+            </label>
+            <div id="newImageInputs" style="margin-top: 0.5rem">
+              <input type="file" name="foto" id="fotoInput" accept="image/*" />
+              <small
+                >La imagen se recortará a 1:1 y se comprimirá
+                automáticamente.</small
+              >
+            </div>
+            <div
+              id="existingImageInputs"
+              style="display: none; margin-top: 0.5rem"
+            >
+              <select id="existingImageSelect">
+                <option value="">(Cargando imágenes...)</option>
+              </select>
+              <div style="margin-top: 0.5rem">
+                <img
+                  id="existingImagePreview"
+                  alt="Preview"
+                  style="
+                    max-width: 120px;
+                    display: none;
+                    border: 1px solid #333;
+                    border-radius: 4px;
+                  "
+                />
+              </div>
+              <small>Selecciona una imagen previamente subida.</small>
+            </div>
+          </fieldset>
           <div class="powersBuilder">
             <button type="button" class="UpperButton" id="editPowersBtn">
               Editar poderes
