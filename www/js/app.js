@@ -134,11 +134,43 @@ async function attachImage(imgEl, assetPath) {
 }
 
 // Perform a manual sync: fetch JSON and images, store to IDB
-async function performSync() {
+// Helper fetch con timeout
+async function fetchWithTimeout(url, opts = {}, ms = 8000) {
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), ms);
   try {
-    showSpinnerOverlay("Sincronizando...");
-    // Fetch and store dimensions
-    let dims = [];
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    return res;
+  } finally {
+    clearTimeout(to);
+  }
+}
+
+// Concurrencia limitada para descarga de imágenes (evitar bloqueo largo)
+async function mapLimited(arr, limit, fn) {
+  const results = [];
+  let i = 0;
+  const workers = new Array(Math.min(limit, arr.length))
+    .fill(0)
+    .map(async () => {
+      while (i < arr.length) {
+        const idx = i++;
+        try {
+          results[idx] = await fn(arr[idx], idx);
+        } catch (e) {
+          results[idx] = null;
+        }
+      }
+    });
+  await Promise.all(workers);
+  return results;
+}
+
+async function performSync() {
+  showSpinnerOverlay("Sincronizando datos...");
+  let dims = [];
+  let chars = [];
+  try {
     try {
       dims = await fetchJSON("/api/dimensions");
     } catch {
@@ -150,22 +182,7 @@ async function performSync() {
           await idbPutObj("dimensions", d);
         } catch {}
       }
-      // Cache dimension images
-      for (const d of dims) {
-        if (d.image) {
-          try {
-            const norm = normalizeAssetPath(d.image);
-            const resp = await fetch("/asset" + norm, { cache: "no-store" });
-            if (resp.ok) {
-              const blob = await resp.blob();
-              await cacheImage(norm, blob);
-            }
-          } catch {}
-        }
-      }
     }
-    // Fetch and store characters
-    let chars = [];
     try {
       chars = await fetchJSON("/api/characters");
     } catch {
@@ -177,27 +194,54 @@ async function performSync() {
           await idbPutObj("characters", c);
         } catch {}
       }
-      for (const c of chars) {
-        if (c.foto) {
-          try {
-            const norm = normalizeAssetPath(c.foto);
-            const resp = await fetch("/asset" + norm, { cache: "no-store" });
-            if (resp.ok) {
-              const blob = await resp.blob();
-              await cacheImage(norm, blob);
-            }
-          } catch {}
-        }
-      }
     }
     const ts = Date.now();
     await idbPut("meta", "lastSync", ts);
-    try {
-      updateLastSyncUI(ts);
-    } catch {}
+    updateLastSyncUI(ts);
   } finally {
-    hideSpinnerOverlay();
+    hideSpinnerOverlay(); // ocultar spinner rápido, continuar con imágenes en background
   }
+  // Cachear imágenes en background (no bloquea UI)
+  setTimeout(async () => {
+    try {
+      // Unir lista de rutas únicas
+      const imgPaths = [];
+      const seen = new Set();
+      dims.forEach((d) => {
+        if (d.image && !seen.has(d.image)) {
+          seen.add(d.image);
+          imgPaths.push(d.image);
+        }
+      });
+      chars.forEach((c) => {
+        if (c.foto && !seen.has(c.foto)) {
+          seen.add(c.foto);
+          imgPaths.push(c.foto);
+        }
+      });
+      // Descargar con concurrencia limitada
+      await mapLimited(imgPaths, 4, async (p) => {
+        const norm = normalizeAssetPath(p);
+        // Usar timeout y evitar bloqueo si 404
+        try {
+          const resp = await fetchWithTimeout(
+            "/asset" + norm,
+            { cache: "no-store" },
+            5000
+          );
+          if (resp.ok) {
+            const blob = await resp.blob();
+            await cacheImage(norm, blob);
+          }
+        } catch (e) {
+          /* ignorar timeout/abort */
+        }
+      });
+      console.log("[performSync] Cache imágenes completado", imgPaths.length);
+    } catch (e) {
+      console.warn("[performSync] Error cacheando imágenes", e);
+    }
+  }, 250);
 }
 // Expose for inline onclick in HTML
 window.performSync = performSync;

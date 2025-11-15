@@ -17,7 +17,7 @@
 
 // WiFi
 const char* ssid = "";
-const char* password ="";
+const char* password = "";
 const IPAddress local_IP(192,168,1,200);
 const IPAddress gateway(192,168,1,1);
 const IPAddress subnet(255,255,255,0);
@@ -170,6 +170,24 @@ static String serializeCharacterWithDim(JsonObject c, JsonArray dimsArr){
   String s; serializeJson(t, s); return s;
 }
 
+// Stream de respuesta grande evitando String gigante en RAM
+void streamCharactersResponse(const std::vector<size_t>& sel, JsonArray arr, JsonArray dimsArr){
+  Serial.printf("[apiCharacters] streaming %u personajes...\n", (unsigned)sel.size());
+  // Cabeceras: enviar sólo encabezados y luego el contenido incremental
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN); // tamaño desconocido
+  server.send(200, "application/json", ""); // envía encabezados
+  server.sendContent("[");
+  bool first = true;
+  for(size_t k=0;k<sel.size();++k){
+    if(!first) server.sendContent(","); else first=false;
+    String item = serializeCharacterWithDim(arr[sel[k]], dimsArr);
+    server.sendContent(item);
+    // Liberar String inmediatamente
+  }
+  server.sendContent("]");
+  Serial.println("[apiCharacters] streaming completado");
+}
+
 // API: GET /api/dimensions
 void apiDimensions(){
   Serial.println("API call: /api/dimensions");
@@ -272,28 +290,13 @@ void apiCharacters(){
       }
       return false;
     });
-    String out = "[";
-    bool first=true;
-    for(size_t k=0;k<sel.size();++k){
-      if(!first) out += ','; else first=false;
-      // Serializar cada objeto individualmente (inyectando dimensionName si falta)
-      out += serializeCharacterWithDim(arr[sel[k]], dimsArr);
-    }
-    out += "]";
-    Serial.println("[apiCharacters] ordenamiento terminado");
-    server.send(200, "application/json", out);
-    return;
+    Serial.println("[apiCharacters] ordenamiento terminado (stream)");
+    streamCharactersResponse(sel, arr, dimsArr);
+    return; // fin
   }
   // Sin ordenamiento
   {
-    String out = "[";
-    bool first=true;
-    for(size_t k=0;k<sel.size();++k){
-      if(!first) out += ','; else first=false;
-      out += serializeCharacterWithDim(arr[sel[k]], dimsArr);
-    }
-    out += "]";
-    server.send(200, "application/json", out);
+    streamCharactersResponse(sel, arr, dimsArr);
   }
 }
 
