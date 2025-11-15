@@ -12,10 +12,12 @@
 #include <SD.h>
 #include <ArduinoJson.h>
 #include <time.h>
+#include <vector>
+#include <algorithm>
 
 // WiFi
 const char* ssid = "";
-const char* password = "";
+const char* password ="";
 const IPAddress local_IP(192,168,1,200);
 const IPAddress gateway(192,168,1,1);
 const IPAddress subnet(255,255,255,0);
@@ -140,6 +142,34 @@ String mimeFromPath(const String &path){
   return "text/plain";
 }
 
+// Helper: encontrar nombre de dimensión por id
+static String lookupDimName(JsonArray dimsArr, const char* did){
+  if(!did) return String("");
+  for(JsonObject d : dimsArr){
+    const char* idd = d["id"];
+    if(idd && String(idd) == String(did)){
+      const char* nom = d["nombre"] ? d["nombre"] : d["name"];
+      return String(nom ? nom : "");
+    }
+  }
+  return String("");
+}
+
+// Helper: serializar personaje, añadiendo dimensionName si falta, sin mutar el documento original
+static String serializeCharacterWithDim(JsonObject c, JsonArray dimsArr){
+  bool hasDimName = c.containsKey("dimensionName");
+  if(hasDimName){ String s; serializeJson(c, s); return s; }
+  const char* did = c["dimension"] | "";
+  String dimName = lookupDimName(dimsArr, did);
+  size_t base = measureJson(c);
+  // margen por clave nueva + nombre
+  DynamicJsonDocument tmpDoc(base + 128 + dimName.length());
+  JsonObject t = tmpDoc.to<JsonObject>();
+  t.set(c);
+  t["dimensionName"] = dimName;
+  String s; serializeJson(t, s); return s;
+}
+
 // API: GET /api/dimensions
 void apiDimensions(){
   Serial.println("API call: /api/dimensions");
@@ -178,58 +208,93 @@ void apiCharacters(){
   String dimId = server.arg("dim");
   String sortField = server.arg("sort");
   String dir = server.arg("dir"); if(dir.length()==0) dir = "asc";
+  Serial.printf("[apiCharacters] Params dim='%s' sort='%s' dir='%s'\n", dimId.c_str(), sortField.c_str(), dir.c_str());
 
   String raw = readFileToStringFS(CHAR_FILE);
+  Serial.printf("[apiCharacters] characters.json size=%u bytes\n", (unsigned)raw.length());
   DynamicJsonDocument doc(32768);
-  deserializeJson(doc, raw);
-  JsonArray arr = doc.as<JsonArray>();
+  DeserializationError derr = deserializeJson(doc, raw);
+  if(derr){
+    Serial.print("[apiCharacters] ERROR deserializing characters.json: "); Serial.println(derr.c_str());
+    server.send(500, "application/json", String("{\"error\":\"JSON characters invalido: ")+derr.c_str()+"\"}");
+    return;
+  }
+  JsonArray arr = doc.is<JsonArray>() ? doc.as<JsonArray>() : JsonArray();
+  if(arr.isNull()){
+    Serial.println("[apiCharacters] characters.json no es un array");
+    server.send(500, "application/json", "{\"error\":\"Formato de characters no es array\"}");
+    return;
+  }
+  Serial.printf("[apiCharacters] personajes cargados: %u\n", (unsigned)arr.size());
 
   // Load dimensions to enrich characters with dimensionName
   String dimsRaw = readFileToStringFS(DIM_FILE);
   DynamicJsonDocument dimsDoc(16384);
-  deserializeJson(dimsDoc, dimsRaw);
-  JsonArray dimsArr = dimsDoc.as<JsonArray>();
-
-  DynamicJsonDocument outDoc(32768);
-  JsonArray outArr = outDoc.to<JsonArray>();
-  for (JsonObject c : arr) {
-    if (dimId.length() == 0 || String((const char*)c["dimension"].as<const char*>()) == dimId) outArr.add(c);
+  DeserializationError derr2 = deserializeJson(dimsDoc, dimsRaw);
+  if(derr2){
+    Serial.print("[apiCharacters] ERROR deserializing dimensions.json: "); Serial.println(derr2.c_str());
+    server.send(500, "application/json", String("{\"error\":\"JSON dimensions invalido: ")+derr2.c_str()+"\"}");
+    return;
   }
-
-  // Enrich dimensionName if missing
-  for (JsonObject c : outArr) {
-    if (!c.containsKey("dimensionName")) {
-      const char* did = c["dimension"];
-      if (did) {
-        for (JsonObject d : dimsArr) {
-          const char* idd = d["id"];
-          if (idd && String(idd) == String(did)) {
-            const char* nom = d["nombre"] ? d["nombre"] : d["name"];
-            if (nom) c["dimensionName"] = nom; else c["dimensionName"] = "";
-            break;
-          }
-        }
-      }
-    }
+  JsonArray dimsArr = dimsDoc.is<JsonArray>() ? dimsDoc.as<JsonArray>() : JsonArray();
+  if(dimsArr.isNull()){
+    Serial.println("[apiCharacters] dimensions.json no es un array");
+    server.send(500, "application/json", "{\"error\":\"Formato de dimensions no es array\"}");
+    return;
   }
+  Serial.printf("[apiCharacters] dimensiones cargadas: %u\n", (unsigned)dimsArr.size());
 
-  // Simple bubble sort (small lists)
-  int n = outArr.size();
-  for(int i=0;i<n;i++){
-    for(int j=i+1;j<n;j++){
-      bool sw=false;
+  // Filtrado sin copiar objetos: mantener solo índices al array original
+  std::vector<size_t> sel;
+  sel.reserve(arr.size());
+  for(size_t i=0;i<arr.size();++i){
+    JsonObject c = arr[i];
+    const char* d = c["dimension"] | "";
+    if (dimId.length() == 0 || String(d) == dimId) sel.push_back(i);
+  }
+  Serial.printf("[apiCharacters] filtrados por dimension: %u\n", (unsigned)sel.size());
+
+  // Ordenamiento manual con índices y construcción de String para reducir RAM
+  if(sortField.length()>0){
+    Serial.println("[apiCharacters] iniciando ordenamiento...");
+    std::sort(sel.begin(), sel.end(), [&](size_t a, size_t b){
       if(sortField=="name"){
-        String a=String((const char*)outArr[i]["nombre"].as<const char*>());
-        String b=String((const char*)outArr[j]["nombre"].as<const char*>());
-        sw = (dir=="asc") ? (a>b) : (a<b);
+        const char* an = arr[a]["nombre"] | "";
+        const char* bn = arr[b]["nombre"] | "";
+        String sa = String(an);
+        String sb = String(bn);
+        int cmp = sa.compareTo(sb);
+        return (dir=="asc") ? (cmp < 0) : (cmp > 0);
       } else if(sortField=="vida"){
-        int a = outArr[i]["vida"] | 0; int b = outArr[j]["vida"] | 0; sw = (dir=="asc") ? (a>b) : (a<b);
+        int va = arr[a]["vida"] | 0;
+        int vb = arr[b]["vida"] | 0;
+        return (dir=="asc") ? (va < vb) : (va > vb);
       }
-      if(sw){ JsonObject tmp = outDoc.createNestedObject(); tmp.set(outArr[i]); outArr[i]=outArr[j]; outArr[j]=tmp; }
+      return false;
+    });
+    String out = "[";
+    bool first=true;
+    for(size_t k=0;k<sel.size();++k){
+      if(!first) out += ','; else first=false;
+      // Serializar cada objeto individualmente (inyectando dimensionName si falta)
+      out += serializeCharacterWithDim(arr[sel[k]], dimsArr);
     }
+    out += "]";
+    Serial.println("[apiCharacters] ordenamiento terminado");
+    server.send(200, "application/json", out);
+    return;
   }
-  String out; serializeJson(outArr, out);
-  server.send(200, "application/json", out);
+  // Sin ordenamiento
+  {
+    String out = "[";
+    bool first=true;
+    for(size_t k=0;k<sel.size();++k){
+      if(!first) out += ','; else first=false;
+      out += serializeCharacterWithDim(arr[sel[k]], dimsArr);
+    }
+    out += "]";
+    server.send(200, "application/json", out);
+  }
 }
 
 // Servir archivos estáticos desde la SD
