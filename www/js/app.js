@@ -278,7 +278,159 @@ function setupAddPage() {
     }
   }
   const dimSelect = document.getElementById("charDim");
-  // Powers modal elements
+  // Editor de personajes (modal)
+  const openCharactersEditorBtn = document.getElementById(
+    "openCharactersEditor"
+  );
+  const charactersModal = document.getElementById("charactersModal");
+  const closeCharactersEditorBtn = document.getElementById(
+    "closeCharactersEditor"
+  );
+  const charListPanel = document.getElementById("charListPanel");
+  const editNombre = document.getElementById("editNombre");
+  const editVida = document.getElementById("editVida");
+  const editDimension = document.getElementById("editDimension");
+  const editId = document.getElementById("editId");
+  const editDescripcion = document.getElementById("editDescripcion");
+  const editComentarios = document.getElementById("editComentarios");
+  const editPowersJSON = document.getElementById("editPowersJSON");
+  const saveCharacterChangesBtn = document.getElementById(
+    "saveCharacterChanges"
+  );
+  const saveCharactersFileBtn = document.getElementById("saveCharactersFile");
+  let editorCharacters = []; // copia editable de /api/characters
+  let currentEditId = null;
+
+  async function loadCharactersForEditor() {
+    try {
+      showSpinner("Cargando personajes...");
+      editorCharacters = await fetchJSON("/api/characters");
+    } catch {
+      editorCharacters = [];
+    } finally {
+      hideSpinner();
+    }
+    renderCharactersList();
+  }
+
+  function renderCharactersList() {
+    if (!charListPanel) return;
+    charListPanel.innerHTML = "";
+    if (!Array.isArray(editorCharacters) || editorCharacters.length === 0) {
+      charListPanel.innerHTML = "<p style='opacity:.7'>No hay personajes</p>";
+      return;
+    }
+    editorCharacters.forEach((c) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "UpperButton";
+      btn.style.display = "block";
+      btn.style.width = "100%";
+      btn.style.marginBottom = "4px";
+      btn.textContent =
+        (c.nombre || "(Sin nombre)") +
+        (c.dimension ? " · " + c.dimension : " ");
+      btn.addEventListener("click", () => selectCharacterForEdit(c.id));
+      charListPanel.appendChild(btn);
+    });
+  }
+
+  function selectCharacterForEdit(id) {
+    const c = editorCharacters.find((x) => String(x.id) === String(id));
+    if (!c) return;
+    currentEditId = c.id;
+    if (editNombre) editNombre.value = c.nombre || "";
+    if (editVida) editVida.value = c.vida != null ? c.vida : "";
+    if (editDimension) editDimension.value = c.dimension || "";
+    if (editId) editId.value = c.id || "";
+    if (editDescripcion) editDescripcion.value = c.descripcion || "";
+    if (editComentarios) editComentarios.value = c.comentarios || "";
+    if (editPowersJSON)
+      editPowersJSON.value = JSON.stringify(c.powers || [], null, 2);
+  }
+
+  function openCharactersEditor() {
+    if (charactersModal) {
+      charactersModal.style.display = "flex";
+      loadCharactersForEditor();
+    }
+  }
+  function closeCharactersEditor() {
+    if (charactersModal) {
+      charactersModal.style.display = "none";
+    }
+  }
+
+  function saveCharacterChanges() {
+    if (!currentEditId) {
+      alert("Selecciona un personaje");
+      return;
+    }
+    const idx = editorCharacters.findIndex(
+      (c) => String(c.id) === String(currentEditId)
+    );
+    if (idx < 0) {
+      alert("Personaje no encontrado");
+      return;
+    }
+    try {
+      let powersArr = [];
+      if (editPowersJSON && editPowersJSON.value.trim()) {
+        powersArr = JSON.parse(editPowersJSON.value);
+      }
+      if (!Array.isArray(powersArr)) powersArr = [];
+      editorCharacters[idx] = {
+        ...editorCharacters[idx],
+        nombre: editNombre.value.trim() || "SinNombre",
+        vida: editVida.value
+          ? Number(editVida.value)
+          : editorCharacters[idx].vida,
+        dimension: editorCharacters[idx].dimension, // no se cambia aquí
+        descripcion: editDescripcion.value.trim(),
+        comentarios: editComentarios.value.trim(),
+        powers: powersArr,
+      };
+      alert("Personaje actualizado localmente. Recuerda 'Guardar archivo'.");
+      renderCharactersList();
+    } catch (e) {
+      alert("Error parseando poderes JSON");
+    }
+  }
+
+  async function saveCharactersFile() {
+    if (!Array.isArray(editorCharacters)) return;
+    try {
+      showSpinner("Guardando archivo...");
+      const res = await fetch("/api/saveCharacters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editorCharacters),
+      });
+      hideSpinner();
+      if (!res.ok) {
+        alert("Error guardando characters.json: HTTP " + res.status);
+        return;
+      }
+      alert("Archivo guardado ✔. Ejecuta sincronización para refrescar caché.");
+    } catch (err) {
+      hideSpinner();
+      alert("Error inesperado guardando archivo");
+    }
+  }
+
+  if (openCharactersEditorBtn) {
+    openCharactersEditorBtn.addEventListener("click", openCharactersEditor);
+  }
+  if (closeCharactersEditorBtn) {
+    closeCharactersEditorBtn.addEventListener("click", closeCharactersEditor);
+  }
+  if (saveCharacterChangesBtn) {
+    saveCharacterChangesBtn.addEventListener("click", saveCharacterChanges);
+  }
+  if (saveCharactersFileBtn) {
+    saveCharactersFileBtn.addEventListener("click", saveCharactersFile);
+  }
+  // Elementos del modal de poderes
   const editBtn = document.getElementById("editPowersBtn");
   const modal = document.getElementById("powersModal");
   const rowsContainer = document.getElementById("powersRows");
