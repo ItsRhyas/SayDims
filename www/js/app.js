@@ -261,7 +261,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const page = detectPage();
   if (page === "index") {
     loadDims();
-    loadRecentCharacters();
     // Show last sync time if available
     (async () => {
       try {
@@ -1055,6 +1054,38 @@ async function fetchJSON(url) {
         }
         return all;
       }
+      if (u.pathname === "/api/character") {
+        const id = u.searchParams.get("id");
+        const all = await idbGetAll("characters");
+        const dims = await idbGetAll("dimensions");
+        const dimNameMap = new Map();
+        dims.forEach((d) => {
+          if (d && d.id) dimNameMap.set(String(d.id), d.nombre || d.name || "");
+        });
+        const found = all.find((c) => String(c.id) === String(id));
+        if (!found) return { character: null, otherVersions: [] };
+        if (!found.dimensionName) {
+          found.dimensionName = dimNameMap.get(String(found.dimension)) || "";
+        }
+        const mv = found.multiverseId || "";
+        const others = all
+          .filter((c) => {
+            if (String(c.id) === String(found.id)) return false;
+            if (mv) return c.multiverseId && c.multiverseId === mv;
+            return c.nombre === found.nombre && c.dimension !== found.dimension;
+          })
+          .map((c) => {
+            if (!c.dimensionName)
+              c.dimensionName = dimNameMap.get(String(c.dimension)) || "";
+            return {
+              id: c.id,
+              dimension: c.dimension,
+              dimensionName: c.dimensionName,
+              foto: c.foto,
+            };
+          });
+        return { character: found, otherVersions: others };
+      }
     } catch {}
     throw err;
   }
@@ -1166,17 +1197,16 @@ function updateCharactersUI(chars) {
 async function initCharacterPage() {
   try {
     const id = new URLSearchParams(location.search).get("id");
-    const chars = await fetchJSON("/api/characters");
-    const char = chars.find((c) => String(c.id) === String(id));
-    if (!char) return;
-    let dimName = char.dimensionName || "Sin dimensión";
-    if ((!dimName || dimName === "") && char.dimension) {
-      try {
-        const dims = await fetchJSON("/api/dimensions");
-        const dim = dims.find((d) => String(d.id) === String(char.dimension));
-        if (dim) dimName = dim.nombre || dim.name || dimName;
-      } catch {}
+    const payload = await fetchJSON(
+      `/api/character?id=${encodeURIComponent(id || "")}`
+    );
+    const char = payload.character;
+    if (!char) {
+      const nf = document.getElementById("character-detail");
+      if (nf) nf.innerHTML = "<p>Personaje no encontrado.</p>";
+      return;
     }
+    let dimName = char.dimensionName || "Sin dimensión";
     let powersRows =
       '<tr><td colspan="3" class="PowerDescription">Sin poderes definidos</td></tr>';
     if (Array.isArray(char.powers) && char.powers.length) {
@@ -1208,14 +1238,9 @@ async function initCharacterPage() {
         createdDisplay = d.toLocaleDateString() + " " + d.toLocaleTimeString();
       } else createdDisplay = escapeHTML(String(char.created));
     }
-    const otherVersions = chars.filter(
-      (c) =>
-        c.id !== char.id &&
-        ((char.multiverseId && c.multiverseId === char.multiverseId) ||
-          (!char.multiverseId &&
-            c.nombre === char.nombre &&
-            c.dimension !== char.dimension))
-    );
+    const otherVersions = Array.isArray(payload.otherVersions)
+      ? payload.otherVersions
+      : [];
     let versionsHTML = "";
     if (otherVersions.length) {
       versionsHTML =
@@ -1230,11 +1255,11 @@ async function initCharacterPage() {
               '<a class="CharacterInList" href="character.html?id=' +
               encodeURIComponent(ov.id) +
               '" aria-label="Ver versión ' +
-              escapeHTML(ov.nombre) +
+              escapeHTML(ov.nombre || char.nombre || "") +
               ' en otra dimensión"><img class="CharImg" data-asset="' +
               escapeHTML(fotoPath) +
               '" alt="' +
-              escapeHTML(ov.nombre || "Personaje") +
+              escapeHTML(ov.nombre || char.nombre || "Personaje") +
               '" /><p class="CharName">' +
               ovDim +
               "</p></a>"

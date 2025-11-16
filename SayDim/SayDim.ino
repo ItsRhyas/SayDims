@@ -79,8 +79,17 @@ String readFileToStringFS(const char* path){
   if(!SD.exists(path)) return String("[]");
   File f = SD.open(path, FILE_READ);
   if(!f) return String();
+  size_t sz = f.size();
   String s;
-  while(f.available()) s += (char)f.read();
+  if(sz > 0) s.reserve(sz + 16); // reservar para evitar fragmentación
+  const size_t BUF_SIZE = 512;
+  char buf[BUF_SIZE];
+  while(f.available()){
+    size_t n = f.readBytes(buf, BUF_SIZE);
+    if(n){
+      s.concat(String(buf).substring(0, n));
+    }
+  }
   f.close();
   return s;
 }
@@ -92,6 +101,18 @@ bool writeStringToFileFS(const char* path, const String &data){
   File f = SD.open(path, FILE_WRITE);
   if(!f) return false;
   f.print(data);
+  f.close();
+  return true;
+}
+
+// Helper: escribir un JsonDocument directamente al archivo sin crear String grande
+bool writeJsonDocumentToFile(const char* path, DynamicJsonDocument &doc){
+  if(!sdAvailable) return false;
+  if(SD.exists(path)) SD.remove(path);
+  File f = SD.open(path, FILE_WRITE);
+  if(!f) return false;
+  // Usa serializeJson para stream directo
+  if(serializeJson(doc, f) == 0){ f.close(); return false; }
   f.close();
   return true;
 }
@@ -217,6 +238,47 @@ void apiDimensions(){
     if (!found) outArr.add(d);
   }
   String out; serializeJson(outArr, out);
+  server.send(200, "application/json", out);
+}
+
+// API: GET /api/character?id=XXXX  (devuelve un personaje y versiones relacionadas)
+void apiCharacter(){
+  Serial.println("API call: /api/character");
+  String id = server.arg("id");
+  if(id.length()==0){ server.send(400, "application/json", "{\"error\":\"id requerido\"}"); return; }
+  String raw = readFileToStringFS(CHAR_FILE);
+  size_t cap = raw.length() + 4096; if(cap < 8192) cap = 8192; if(cap > 131072) cap = 131072;
+  DynamicJsonDocument doc(cap);
+  DeserializationError derr = deserializeJson(doc, raw);
+  if(derr){ server.send(500, "application/json", String("{\"error\":\"JSON inválido: ")+derr.c_str()+"\"}"); return; }
+  if(!doc.is<JsonArray>()){ server.send(500, "application/json", "{\"error\":\"Formato inesperado\"}"); return; }
+  JsonArray arr = doc.as<JsonArray>();
+  JsonObject found;
+  for(JsonObject c : arr){ const char* cid = c["id"]; if(cid && id == String(cid)){ found = c; break; } }
+  if(found.isNull()){ server.send(404, "application/json", "{\"error\":\"No encontrado\"}"); return; }
+  // dimensiones para dimensionName
+  String dimsRaw = readFileToStringFS(DIM_FILE);
+  DynamicJsonDocument dimsDoc(16384); deserializeJson(dimsDoc, dimsRaw);
+  JsonArray dimsArr = dimsDoc.is<JsonArray>()? dimsDoc.as<JsonArray>(): JsonArray();
+  String did = String((const char*)found["dimension"].as<const char*>());
+  String dimName = lookupDimName(dimsArr, did.c_str());
+  String multiverseId = String((const char*)found["multiverseId"].as<const char*>());
+  DynamicJsonDocument outDoc(8192 + multiverseId.length()*8);
+  JsonObject root = outDoc.to<JsonObject>();
+  JsonObject outChar = root.createNestedObject("character"); outChar.set(found);
+  if(!outChar.containsKey("dimensionName")) outChar["dimensionName"] = dimName;
+  JsonArray others = root.createNestedArray("otherVersions");
+  for(JsonObject c : arr){
+    const char* cid = c["id"]; if(!cid) continue; if(String(cid)==id) continue;
+    bool related=false;
+    if(multiverseId.length()>0){ const char* mv = c["multiverseId"]; if(mv && String(mv)==multiverseId) related=true; }
+    else {
+      const char* nm = c["nombre"]; const char* dm = c["dimension"]; const char* dm2 = found["dimension"];
+      if(nm && dm && dm2 && String(nm)==String((const char*)found["nombre"].as<const char*>()) && String(dm)!=String(dm2)) related=true;
+    }
+    if(related){ JsonObject o = others.createNestedObject(); o["id"] = cid; o["dimension"] = c["dimension"] | ""; o["foto"] = c["foto"] | ""; const char* dimOther = c["dimension"] | ""; o["dimensionName"] = lookupDimName(dimsArr, dimOther); }
+  }
+  String out; serializeJson(root, out);
   server.send(200, "application/json", out);
 }
 
@@ -561,10 +623,13 @@ void handleUploadCharacter(){
       if(String((const char*)d["id"].as<const char*>())==dimension){ dimExists=true; break; }
     }
     if(!dimExists){ Serial.println("Dimension no existe: " + dimension); server.send(400, "application/json", "{\"error\":\"La dimensión no existe\"}"); return; }
-    // Cargar personajes existentes para lógica de duplicados y multiverso
+    // Cargar personajes existentes (capacidad dinámica para evitar abort)
     String raw = readFileToStringFS(CHAR_FILE);
-    DynamicJsonDocument charsDoc(32768);
-    deserializeJson(charsDoc, raw);
+    size_t cap = raw.length() + 4096; if(cap < 8192) cap = 8192; if(cap > 131072) cap = 131072;
+    DynamicJsonDocument charsDoc(cap);
+    DeserializationError derrChars = deserializeJson(charsDoc, raw);
+    if(derrChars){ server.send(500, "application/json", "{\"error\":\"characters.json inválido\"}"); return; }
+    if(!charsDoc.is<JsonArray>()){ server.send(500, "application/json", "{\"error\":\"Formato characters inválido\"}"); return; }
     JsonArray carr = charsDoc.as<JsonArray>();
     // Comprobación de duplicado (mismo nombre + misma dimensión)
     for(JsonObject c : carr){
@@ -601,8 +666,7 @@ void handleUploadCharacter(){
         }
       }
     }
-    DynamicJsonDocument doc(8192);
-    JsonObject obj = doc.to<JsonObject>();
+    JsonObject obj = carr.createNestedObject();
     obj["id"] = charId;
     obj["nombre"] = nombre;
     obj["dimension"] = dimension;
@@ -612,12 +676,13 @@ void handleUploadCharacter(){
     obj["comentarios"] = comentarios;
     obj["created"] = String((uint32_t)time(nullptr));
     if(multiverseId.length()>0) obj["multiverseId"] = multiverseId;
-    DynamicJsonDocument pdoc(4096);
-    DeserializationError perr = deserializeJson(pdoc, powers);
-    if(!perr) obj["powers"] = pdoc.as<JsonArray>(); else obj.createNestedArray("powers");
-    carr.add(obj);
+    {
+      DynamicJsonDocument pdoc(powers.length()+512);
+      DeserializationError perr = deserializeJson(pdoc, powers);
+      if(!perr && pdoc.is<JsonArray>()) obj["powers"] = pdoc.as<JsonArray>(); else obj.createNestedArray("powers");
+    }
     String out; serializeJson(charsDoc, out);
-    writeStringToFileFS(CHAR_FILE, out);
+    writeJsonDocumentToFile(CHAR_FILE, charsDoc);
     Serial.println("Personaje creado: " + nombre);
     String resp = String("{\"ok\":true,\"id\":\"")+charId+"\"" + (multiverseId.length()>0? (",\"multiverseId\":\""+multiverseId+"\"") : "") + "}";
     server.send(200, "application/json", resp);
@@ -726,6 +791,7 @@ void setup(){
   // Endpoints de API para datos
   server.on("/api/dimensions", HTTP_GET, apiDimensions);
   server.on("/api/characters", HTTP_GET, apiCharacters);
+  server.on("/api/character", HTTP_GET, apiCharacter);
   // Crear personaje usando imagen existente (sin subir archivo nuevo)
   server.on("/api/createCharacterExisting", HTTP_POST, [](){
     if(!sdAvailable){ server.send(503, "application/json", "{\"error\":\"SD no disponible\"}"); return; }
@@ -753,10 +819,13 @@ void setup(){
       const char* idd = d["id"]; if(idd && String(idd)==String(dimensionC)){ dimExists=true; break; }
     }
     if(!dimExists){ server.send(400, "application/json", "{\"error\":\"La dimensión no existe\"}"); return; }
-    // Cargar personajes existentes
+    // Cargar personajes existentes (capacidad dinámica)
     String rawChars = readFileToStringFS(CHAR_FILE);
-    DynamicJsonDocument charsDoc(32768);
-    deserializeJson(charsDoc, rawChars);
+    size_t capChars = rawChars.length() + 4096; if(capChars < 8192) capChars = 8192; if(capChars > 131072) capChars = 131072;
+    DynamicJsonDocument charsDoc(capChars);
+    DeserializationError derrChars = deserializeJson(charsDoc, rawChars);
+    if(derrChars){ server.send(500, "application/json", "{\"error\":\"characters.json inválido\"}"); return; }
+    if(!charsDoc.is<JsonArray>()){ server.send(500, "application/json", "{\"error\":\"Formato characters inválido\"}"); return; }
     JsonArray carr = charsDoc.as<JsonArray>();
     // Duplicado: mismo nombre + misma dimensión
     for(JsonObject c : carr){
@@ -782,26 +851,19 @@ void setup(){
     }
     // Crear nuevo objeto
     String charId = getTimestampId() + String(esp_random() & 0xFFFF, HEX);
-    DynamicJsonDocument newDoc(8192);
-    JsonObject obj = newDoc.to<JsonObject>();
+    JsonObject obj = carr.createNestedObject();
     obj["id"] = charId;
     obj["nombre"] = String(nombreC).length()? nombreC : "SinNombre";
     obj["dimension"] = dimensionC;
     obj["vida"] = vidaC;
     obj["descripcion"] = descripcionC;
-    obj["foto"] = fotoC; // reutiliza imagen existente
+    obj["foto"] = fotoC;
     obj["comentarios"] = comentariosC;
     obj["created"] = String((uint32_t)time(nullptr));
     if(multiverseId.length()>0) obj["multiverseId"] = multiverseId;
-    // Poderes
-    if(doc.containsKey("powers") && doc["powers"].is<JsonArray>()){
-      obj["powers"] = doc["powers"].as<JsonArray>();
-    } else {
-      obj.createNestedArray("powers");
-    }
-    carr.add(obj);
+    if(doc.containsKey("powers") && doc["powers"].is<JsonArray>()) obj["powers"] = doc["powers"].as<JsonArray>(); else obj.createNestedArray("powers");
     String outChars; serializeJson(charsDoc, outChars);
-    if(!writeStringToFileFS(CHAR_FILE, outChars)){ server.send(500, "application/json", "{\"error\":\"No se pudo escribir archivo\"}"); return; }
+    if(!writeJsonDocumentToFile(CHAR_FILE, charsDoc)){ server.send(500, "application/json", "{\"error\":\"No se pudo escribir archivo\"}"); return; }
     String resp = String("{\"ok\":true,\"id\":\"") + charId + "\"" + (multiverseId.length()>0? (",\"multiverseId\":\""+multiverseId+"\"") : "") + "}";
     server.send(200, "application/json", resp);
   });
@@ -814,8 +876,7 @@ void setup(){
     DeserializationError err = deserializeJson(doc, body);
     if(err){ server.send(400, "application/json", "{\"error\":\"JSON inválido\"}"); return; }
     if(!doc.is<JsonArray>()){ server.send(400, "application/json", "{\"error\":\"Se espera un array\"}"); return; }
-    String out; serializeJson(doc, out);
-    if(!writeStringToFileFS(CHAR_FILE, out)){ server.send(500, "application/json", "{\"error\":\"No se pudo escribir archivo\"}"); return; }
+    if(!writeJsonDocumentToFile(CHAR_FILE, doc)){ server.send(500, "application/json", "{\"error\":\"No se pudo escribir archivo\"}"); return; }
     server.send(200, "application/json", "{\"ok\":true}" );
   });
   
