@@ -17,7 +17,7 @@
 
 // WiFi
 const char* ssid = "";
-const char* password = "";
+const char* password ="";
 const IPAddress local_IP(192,168,1,200);
 const IPAddress gateway(192,168,1,1);
 const IPAddress subnet(255,255,255,0);
@@ -83,12 +83,10 @@ String readFileToStringFS(const char* path){
   String s;
   if(sz > 0) s.reserve(sz + 16); // reservar para evitar fragmentación
   const size_t BUF_SIZE = 512;
-  char buf[BUF_SIZE];
+  char buf[BUF_SIZE + 1];
   while(f.available()){
     size_t n = f.readBytes(buf, BUF_SIZE);
-    if(n){
-      s.concat(String(buf).substring(0, n));
-    }
+    if(n){ buf[n] = '\0'; s += buf; }
   }
   f.close();
   return s;
@@ -161,6 +159,51 @@ String mimeFromPath(const String &path){
   if(path.endsWith(".png")) return "image/png";
   if(path.endsWith(".json")) return "application/json";
   return "text/plain";
+}
+// Heap diagnostics (ESP32)
+static size_t freeHeap(){ return ESP.getFreeHeap(); }
+static void logHeap(const char* tag){ Serial.printf("[HEAP] %s free=%u bytes\n", tag, (unsigned)freeHeap()); }
+
+// ---- Helpers de nombre de archivo (PascalCase) ----
+static bool isAsciiLetter(char c){ return (c>='A'&&c<='Z') || (c>='a'&&c<='z'); }
+static bool isAsciiDigit(char c){ return (c>='0'&&c<='9'); }
+static char toUpperAscii(char c){ if(c>='a'&&c<='z') return (char)(c-32); return c; }
+static char toLowerAscii(char c){ if(c>='A'&&c<='Z') return (char)(c+32); return c; }
+
+static String toPascalCase(const String &in){
+  String out; out.reserve(in.length()+4);
+  bool newWord = true;
+  for(size_t i=0;i<in.length();++i){
+    char c = in.charAt(i);
+    if(isAsciiLetter(c)){
+      out += newWord ? toUpperAscii(c) : toLowerAscii(c);
+      newWord = false;
+    } else if(isAsciiDigit(c)){
+      out += c;
+      newWord = false;
+    } else {
+      newWord = true; // separador
+    }
+  }
+  // evitar vacío
+  if(out.length()==0) out = "Personaje";
+  return out;
+}
+
+static String makeImagePathFromName(const String &name, const String &charId){
+  String base = toPascalCase(name);
+  String candidate = String(CHAR_DIR) + "/" + base + ".jpg";
+  if(!SD.exists(candidate.c_str())) return candidate;
+  // añadir sufijo corto con el id para evitar colisión
+  String candidate2 = String(CHAR_DIR) + "/" + base + "-" + charId.substring(0,4) + ".jpg";
+  if(!SD.exists(candidate2.c_str())) return candidate2;
+  // fallback con contador
+  for(int i=1;i<=99;i++){
+    String c = String(CHAR_DIR) + "/" + base + "-" + String(i) + ".jpg";
+    if(!SD.exists(c.c_str())) return c;
+  }
+  // como último recurso
+  return String(CHAR_DIR) + "/" + base + "-" + charId + ".jpg";
 }
 
 // Helper: encontrar nombre de dimensión por id
@@ -597,16 +640,19 @@ void handleUploadCharacter(){
       return;
     }
     charId = getTimestampId() + String(esp_random() & 0xFFFF, HEX);
-    path = String(CHAR_DIR) + "/" + charId + ".jpg";
+    // Guardar temporalmente; renombraremos al final según nombre en PascalCase
+    path = String(CHAR_DIR) + "/_upload-" + charId + ".jpg";
     if(!SD.exists(CHAR_DIR)) SD.mkdir(CHAR_DIR);
     upFile = SD.open(path.c_str(), FILE_WRITE);
     Serial.print("Subiendo imagen de personaje -> "); Serial.println(path);
+    logHeap("after FILE_START");
   } else if(upload.status == UPLOAD_FILE_WRITE){
     if(rejectUpload) return;
     if(upFile) upFile.write(upload.buf, upload.currentSize);
   } else if(upload.status == UPLOAD_FILE_END){
     if(rejectUpload) { server.send(503, "text/plain", "SD no disponible"); return; }
     if(upFile) upFile.close();
+    logHeap("after FILE_END");
     String nombre = server.arg("nombre"); if(nombre.length()==0) nombre = "SinNombre";
     String dimension = server.arg("dimension");
     String vida = server.arg("vida"); if(vida.length()==0) vida = "0";
@@ -615,21 +661,48 @@ void handleUploadCharacter(){
     String comentarios = server.arg("comentarios");
 
     // asegurar que la dimensión exista
-    String dimRaw = readFileToStringFS(DIM_FILE);
-    DynamicJsonDocument dimsDoc(16384);
-    deserializeJson(dimsDoc, dimRaw);
+    size_t dimsSize = 0; { File fsz = SD.open(DIM_FILE, FILE_READ); if(fsz){ dimsSize = fsz.size(); fsz.close(); } }
+    size_t dimsCap = dimsSize + 1024; if(dimsCap < 4096) dimsCap = 4096; if(dimsCap > 24576) dimsCap = 24576;
+    DynamicJsonDocument dimsDoc(dimsCap);
+    {
+      File f = SD.open(DIM_FILE, FILE_READ);
+      DeserializationError derr = deserializeJson(dimsDoc, f);
+      f.close();
+      if(derr){
+        Serial.printf("ERROR parseando dimensiones: %s\n", derr.c_str());
+        if(SD.exists(path.c_str())) SD.remove(path.c_str());
+        server.send(500, "application/json", "{\"error\":\"dimensiones inválidas\"}");
+        return;
+      }
+    }
     bool dimExists=false;
     for(JsonObject d : dimsDoc.as<JsonArray>()){
       if(String((const char*)d["id"].as<const char*>())==dimension){ dimExists=true; break; }
     }
-    if(!dimExists){ Serial.println("Dimension no existe: " + dimension); server.send(400, "application/json", "{\"error\":\"La dimensión no existe\"}"); return; }
+    if(!dimExists){
+      Serial.println("Dimension no existe: " + dimension);
+      if(SD.exists(path.c_str())) SD.remove(path.c_str());
+      server.send(400, "application/json", "{\"error\":\"La dimensión no existe\"}");
+      return;
+    }
     // Cargar personajes existentes (capacidad dinámica para evitar abort)
-    String raw = readFileToStringFS(CHAR_FILE);
-    size_t cap = raw.length() + 4096; if(cap < 8192) cap = 8192; if(cap > 131072) cap = 131072;
-    DynamicJsonDocument charsDoc(cap);
-    DeserializationError derrChars = deserializeJson(charsDoc, raw);
-    if(derrChars){ server.send(500, "application/json", "{\"error\":\"characters.json inválido\"}"); return; }
-    if(!charsDoc.is<JsonArray>()){ server.send(500, "application/json", "{\"error\":\"Formato characters inválido\"}"); return; }
+    size_t charsSize = 0; { File cf = SD.open(CHAR_FILE, FILE_READ); if(cf){ charsSize = cf.size(); cf.close(); } }
+    size_t charsCap = charsSize + 4096; if(charsCap < 8192) charsCap = 8192; if(charsCap > 98304) charsCap = 98304; // limitar para evitar OOM
+    logHeap("before parse characters");
+    DynamicJsonDocument charsDoc(charsCap);
+    {
+      File f = SD.open(CHAR_FILE, FILE_READ);
+      DeserializationError derrChars = deserializeJson(charsDoc, f);
+      f.close();
+      if(derrChars){
+        Serial.printf("ERROR parseando characters.json: %s size=%u cap=%u\n", derrChars.c_str(), (unsigned)charsSize, (unsigned)charsCap);
+        if(SD.exists(path.c_str())) SD.remove(path.c_str());
+        server.send(500, "application/json", "{\"error\":\"characters.json inválido\"}");
+        return;
+      }
+    }
+    if(!charsDoc.is<JsonArray>()){ if(SD.exists(path.c_str())) SD.remove(path.c_str()); server.send(500, "application/json", "{\"error\":\"Formato characters inválido\"}"); return; }
+    logHeap("after parse characters");
     JsonArray carr = charsDoc.as<JsonArray>();
     // Comprobación de duplicado (mismo nombre + misma dimensión)
     for(JsonObject c : carr){
@@ -666,13 +739,25 @@ void handleUploadCharacter(){
         }
       }
     }
+    // Renombrar la imagen al nombre en PascalCase (único)
+    {
+      String finalPath = makeImagePathFromName(nombre, charId);
+      if(!SD.rename(path.c_str(), finalPath.c_str())){
+        // si falla, mantener temporal
+        Serial.println("WARN: rename falló, se mantiene nombre temporal");
+      } else {
+        path = finalPath;
+      }
+    }
+    logHeap("before append character");
+
     JsonObject obj = carr.createNestedObject();
     obj["id"] = charId;
     obj["nombre"] = nombre;
     obj["dimension"] = dimension;
     obj["vida"] = atoi(vida.c_str());
     obj["descripcion"] = descripcion;
-    obj["foto"] = String(CHAR_DIR) + "/" + charId + ".jpg";
+    obj["foto"] = path;
     obj["comentarios"] = comentarios;
     obj["created"] = String((uint32_t)time(nullptr));
     if(multiverseId.length()>0) obj["multiverseId"] = multiverseId;
@@ -681,6 +766,7 @@ void handleUploadCharacter(){
       DeserializationError perr = deserializeJson(pdoc, powers);
       if(!perr && pdoc.is<JsonArray>()) obj["powers"] = pdoc.as<JsonArray>(); else obj.createNestedArray("powers");
     }
+    logHeap("after append character");
     String out; serializeJson(charsDoc, out);
     writeJsonDocumentToFile(CHAR_FILE, charsDoc);
     Serial.println("Personaje creado: " + nombre);
